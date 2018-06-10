@@ -1,10 +1,11 @@
 package config
 
 import (
-    "github.com/Unknwon/goconfig"
     "errors"
     "io/ioutil"
     "strconv"
+
+    "github.com/Unknwon/goconfig"
 )
 
 type Client struct {
