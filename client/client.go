@@ -1,6 +1,7 @@
 package client
 
 import (
+    "container/heap"
     "crypto/tls"
     "crypto/x509"
     "fmt"
@@ -8,7 +9,7 @@ import (
     "log"
     "net"
     "net/url"
-    "sync/atomic"
+    "sync"
 
     "github.com/Sherlock-Holo/camouflage/config"
     websocket2 "github.com/Sherlock-Holo/goutils/websocket"
@@ -20,15 +21,54 @@ import (
 const maxLinks = 100
 
 type managerStatus struct {
-    count  int32
-    usable bool
+    manager *link.Manager
+    count   int32
+    usable  bool
+
+    index int
+}
+
+type managerHeap []*managerStatus
+
+func (h *managerHeap) Len() int {
+    return len(*h)
+}
+
+func (h *managerHeap) Less(i, j int) bool {
+    return (*h)[i].count < (*h)[j].count
+}
+
+func (h *managerHeap) Swap(i, j int) {
+    (*h)[i], (*h)[j] = (*h)[j], (*h)[i]
+    (*h)[i].index, (*h)[j].index = i, j
+}
+
+func (h *managerHeap) Push(x interface{}) {
+    st := x.(*managerStatus)
+    st.index = len(*h)
+    *h = append(*h, st)
+}
+
+func (h *managerHeap) Pop() interface{} {
+    old := *h
+
+    status := old[len(old)-1]
+    status.index = -1
+
+    *h = old[:len(old)-1]
+
+    return status
 }
 
 type Client struct {
     listener net.Listener
-    wsURL    string
-    managers map[*link.Manager]*managerStatus
-    dialer   websocket.Dialer
+
+    wsURL string
+
+    managerPool *managerHeap
+    poolLock    sync.Mutex
+
+    dialer websocket.Dialer
 }
 
 func NewClient(cfg config.Client) (*Client, error) {
@@ -61,9 +101,12 @@ func NewClient(cfg config.Client) (*Client, error) {
 
     return &Client{
         listener: listener,
-        wsURL:    wsURL,
-        managers: make(map[*link.Manager]*managerStatus),
-        dialer:   dialer,
+
+        wsURL: wsURL,
+
+        managerPool: new(managerHeap),
+
+        dialer: dialer,
     }, nil
 }
 
@@ -90,29 +133,31 @@ func (c *Client) handle(conn net.Conn) {
     socksLocalAddr := socks.LocalAddr().(*net.TCPAddr)
 
     var (
-        manager *link.Manager
-        links   = len(c.managers)
+        status *managerStatus
+        inPool bool
     )
 
-RANDOM:
-    for i := 0; i < links; i++ {
-        for m, status := range c.managers {
-            if !status.usable {
-                // delete usable manager
-                c.deleteManager(m)
-                break
-            }
+    c.poolLock.Lock()
+    for c.managerPool.Len() > 0 {
+        st := heap.Pop(c.managerPool).(*managerStatus)
+        if !st.usable {
+            continue
+        }
 
-            if atomic.LoadInt32(&status.count) < maxLinks {
-                manager = m
-                atomic.AddInt32(&status.count, 1)
-                break RANDOM
-            }
+        if st.count >= maxLinks {
+            heap.Push(c.managerPool, st)
             break
         }
-    }
 
-    if manager == nil {
+        status = st
+        status.count++
+        heap.Push(c.managerPool, status)
+        inPool = true
+        break
+    }
+    c.poolLock.Unlock()
+
+    if !inPool {
         conn, _, err := c.dialer.Dial(c.wsURL, nil)
         if err != nil {
             log.Println("dial websocket:", err)
@@ -121,35 +166,46 @@ RANDOM:
             return
         }
 
-        manager = link.NewManager(websocket2.NewWrapper(conn))
-
-        c.managers[manager] = &managerStatus{
-            count:  0,
-            usable: true,
+        status = &managerStatus{
+            manager: link.NewManager(websocket2.NewWrapper(conn)),
+            count:   1,
+            usable:  true,
         }
     }
 
     localAddr := conn.LocalAddr().(*net.TCPAddr)
 
-    l, err := manager.NewLink()
+    l, err := status.manager.NewLink()
     if err != nil {
         log.Println("newLink:", err)
         socks.Reply(socksLocalAddr.IP, uint16(socksLocalAddr.Port), libsocks.ServerFailed)
         socks.Close()
-        manager.Close()
-        // delete broken manager
-        c.deleteManager(manager)
+        status.manager.Close()
+
+        if inPool {
+            c.poolLock.Lock()
+            heap.Remove(c.managerPool, status.index)
+            c.poolLock.Unlock()
+        }
+
         return
     }
 
-    atomic.AddInt32(&c.managers[manager].count, 1)
+    c.poolLock.Lock()
+    heap.Push(c.managerPool, status)
+    c.poolLock.Unlock()
 
     if _, err := l.Write(socks.Target.Bytes()); err != nil {
         log.Println("send target:", err)
         socks.Reply(socksLocalAddr.IP, uint16(socksLocalAddr.Port), libsocks.ServerFailed)
         socks.Close()
         l.Close()
-        atomic.AddInt32(&c.managers[manager].count, -1)
+
+        c.poolLock.Lock()
+        status.count--
+        heap.Fix(c.managerPool, status.index)
+        c.poolLock.Unlock()
+
         return
     }
 
@@ -158,7 +214,12 @@ RANDOM:
         log.Println("socks reply", err)
         socks.Close()
         l.Close()
-        atomic.AddInt32(&c.managers[manager].count, -1)
+
+        c.poolLock.Lock()
+        status.count--
+        heap.Fix(c.managerPool, status.index)
+        c.poolLock.Unlock()
+
         return
     }
 
@@ -205,17 +266,14 @@ RANDOM:
     for i := 0; i < 2; i++ {
         select {
         case <-die:
-            atomic.AddInt32(&c.managers[manager].count, -1)
+            c.poolLock.Lock()
+            status.count--
+            heap.Fix(c.managerPool, status.index)
+            c.poolLock.Unlock()
+
             return
 
         case <-closeCount:
         }
-    }
-}
-
-func (c *Client) deleteManager(m *link.Manager) {
-    if status, ok := c.managers[m]; ok {
-        status.usable = false
-        delete(c.managers, m)
     }
 }
