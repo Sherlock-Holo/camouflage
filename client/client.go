@@ -37,11 +37,11 @@ func NewClient(cfg config.Client) (*Client, error) {
         return nil, err
     }
 
-    wsURL := url.URL{
+    wsURL := (&url.URL{
         Scheme: "wss",
         Host:   fmt.Sprintf("%s:%d", cfg.RemoteAddr, cfg.RemotePort),
         Path:   cfg.Path,
-    }.String()
+    }).String()
 
     pool := x509.NewCertPool()
 
