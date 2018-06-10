@@ -94,12 +94,7 @@ func (s *Server) Run() {
     log.Println(s.server.ListenAndServeTLS(s.config.CrtFile, s.config.KeyFile))
 }
 
-func NewServer(cfgFile string) (*Server, error) {
-    cfg, err := config.ReadServer(cfgFile)
-    if err != nil {
-        return nil, err
-    }
-
+func NewServer(cfg config.Server) (*Server, error) {
     pool := x509.NewCertPool()
     pool.AppendCertsFromPEM(cfg.CA)
 
