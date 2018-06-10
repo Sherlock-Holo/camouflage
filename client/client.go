@@ -291,16 +291,20 @@ func (c *Client) clean() {
 
     for {
         <-ticker.C
+
         c.poolLock.Lock()
-        for _, status := range *c.managerPool {
+        for {
             if c.managerPool.Len() <= 2 {
                 break
             }
 
-            if status.count == 0 {
-                heap.Remove(c.managerPool, status.index)
+            status := c.managerPool.Pop().(*managerStatus)
+            if status.count != 0 {
+                break
             }
+            log.Println("clean a useless manager")
         }
+
         c.poolLock.Unlock()
     }
 }
