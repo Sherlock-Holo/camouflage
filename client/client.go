@@ -10,6 +10,7 @@ import (
     "net"
     "net/url"
     "sync"
+    "time"
 
     "github.com/Sherlock-Holo/camouflage/config"
     websocket2 "github.com/Sherlock-Holo/goutils/websocket"
@@ -111,6 +112,8 @@ func NewClient(cfg config.Client) (*Client, error) {
 }
 
 func (c *Client) Run() {
+    go c.clean()
+
     for {
         conn, err := c.listener.Accept()
         if err != nil {
@@ -281,4 +284,23 @@ func (c *Client) handle(conn net.Conn) {
     status.count--
     heap.Fix(c.managerPool, status.index)
     c.poolLock.Unlock()
+}
+
+func (c *Client) clean() {
+    ticker := time.NewTicker(time.Minute)
+
+    for {
+        <-ticker.C
+        c.poolLock.Lock()
+        for _, status := range *c.managerPool {
+            if c.managerPool.Len() <= 2 {
+                break
+            }
+
+            if status.count == 0 {
+                heap.Remove(c.managerPool, status.index)
+            }
+        }
+        c.poolLock.Unlock()
+    }
 }
