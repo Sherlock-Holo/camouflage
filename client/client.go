@@ -276,4 +276,9 @@ func (c *Client) handle(conn net.Conn) {
         case <-closeCount:
         }
     }
+
+    c.poolLock.Lock()
+    status.count--
+    heap.Fix(c.managerPool, status.index)
+    c.poolLock.Unlock()
 }
