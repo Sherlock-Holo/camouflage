@@ -302,6 +302,7 @@ func (c *Client) clean() {
             if status.count != 0 {
                 break
             }
+            status.manager.Close()
             log.Println("clean a useless manager")
         }
 
