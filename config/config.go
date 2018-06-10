@@ -14,6 +14,8 @@ type Client struct {
     RemoteAddr string
     RemotePort int
 
+    Path string
+
     CA []byte
 
     CrtFile string
@@ -23,6 +25,8 @@ type Client struct {
 type Server struct {
     BindAddr string
     BindPort int
+
+    Path string
 
     CA []byte
 
@@ -56,6 +60,12 @@ func ReadClient(cfgFile string) (Client, error) {
         }
     } else {
         return Client{}, errors.New("need remote_port")
+    }
+
+    if path, ok := section["path"]; ok {
+        client.Path = path
+    } else {
+        return Client{}, errors.New("need path")
     }
 
     if socksAddr, ok := section["socks_addr"]; ok {
@@ -125,6 +135,12 @@ func ReadServer(cfgFile string) (Server, error) {
         }
     } else {
         return Server{}, errors.New("need bind_port")
+    }
+
+    if path, ok := section["path"]; ok {
+        server.Path = path
+    } else {
+        return Server{}, errors.New("need path")
     }
 
     if caFile, ok := section["ca_crt"]; ok {

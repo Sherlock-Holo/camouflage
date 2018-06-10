@@ -18,6 +18,10 @@ func TestReadClient(t *testing.T) {
         t.Error("remote_port wrong")
     }
 
+    if client.Path != "/websocket" {
+        t.Error("path wrong")
+    }
+
     if client.SocksAddr != "127.0.0.1" {
         t.Error("socks_addr wrong")
     }
@@ -47,6 +51,10 @@ func TestReadServer(t *testing.T) {
 
     if server.BindPort != 9876 {
         t.Error("bind_port wrong")
+    }
+
+    if server.Path != "/websocket" {
+        t.Error("path wrong")
     }
 
     if server.CrtFile != "/home/sherlock/go/src/go-learn/tls/tls/server/server.crt" {
