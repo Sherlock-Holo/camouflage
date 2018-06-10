@@ -19,13 +19,13 @@ func main() {
 
     if flag.NFlag() == 0 {
         flag.Usage()
-        os.Exit(1)
+        os.Exit(2)
     }
 
     switch {
     case *clientCfg != "" && *serverCfg != "":
         fmt.Fprintln(os.Stderr, "can't use client and server at the same time")
-        os.Exit(1)
+        os.Exit(2)
 
     case *clientCfg != "":
         cfg, err := config.ReadClient(*clientCfg)
