@@ -19,7 +19,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const maxLinks = 100
+const maxLinks = 200
 
 type managerStatus struct {
 	manager *link.Manager
