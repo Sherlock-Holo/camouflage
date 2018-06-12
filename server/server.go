@@ -140,7 +140,7 @@ func NewServer(cfg config.Server) (*Server, error) {
 	handler.server = server
 
 	if cfg.DNS != "" {
-		resolver := dns.NewResolver(cfg.DNS, cfg.Net, cfg.DNSTimeout)
+		resolver := dns.NewResolver(cfg.DNS, cfg.Net)
 		server.resolver = &resolver
 	}
 

@@ -31,13 +31,13 @@ var DefaultResolver = Resolver{
 	},
 }
 
-func NewResolver(server string, net string, timeout time.Duration) Resolver {
+func NewResolver(server string, net string) Resolver {
 	return Resolver{
 		Server: server,
 
 		client: dns.Client{
 			Net:     net,
-			Timeout: timeout,
+			Timeout: 5 * time.Second,
 		},
 	}
 }
@@ -126,7 +126,7 @@ func (r *Resolver) query(host string, ipv6 bool, ctx context.Context) (Result, e
 	return result, nil
 }
 
-func (r *Resolver) Query(host string, ipv6 bool, timeout time.Duration) (Result, error) {
+func (r *Resolver) Query(host string, ipv6 bool, timeout time.Duration) (result Result, err error) {
 	var ctx context.Context
 
 	if timeout > 0 {
@@ -135,5 +135,14 @@ func (r *Resolver) Query(host string, ipv6 bool, timeout time.Duration) (Result,
 		ctx = context.Background()
 	}
 
-	return r.query(host, ipv6, ctx)
+	for i := 0; i < 16; i++ {
+		result, err = r.query(host, ipv6, ctx)
+		if err != nil {
+			continue
+		}
+
+		return
+	}
+
+	return
 }
