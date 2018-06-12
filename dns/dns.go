@@ -25,13 +25,24 @@ type Result struct {
 }
 
 var DefaultResolver = Resolver{
-	Server: "127.0.0.1:53",
+	Server: "1.1.1.1:53",
 	client: dns.Client{
-		Timeout: 2 * time.Second,
+		Timeout: 30 * time.Second,
 	},
 }
 
-func (r *Resolver) qQery(host string, ipv6 bool, ctx context.Context) (Result, error) {
+func NewResolver(server string, net string, timeout time.Duration) Resolver {
+	return Resolver{
+		Server: server,
+
+		client: dns.Client{
+			Net:     net,
+			Timeout: timeout,
+		},
+	}
+}
+
+func (r *Resolver) query(host string, ipv6 bool, ctx context.Context) (Result, error) {
 	// TODO: edns client subnet
 
 	var msgs []*dns.Msg
@@ -92,7 +103,7 @@ func (r *Resolver) qQery(host string, ipv6 bool, ctx context.Context) (Result, e
 					result.aaaaLock.Unlock()
 
 				case *dns.CNAME:
-					cnameResult, err := r.qQery(an.Target, ipv6, ctx)
+					cnameResult, err := r.query(an.Target, ipv6, ctx)
 					if err == nil {
 						result.aLock.Lock()
 						result.AIP = append(result.AIP, cnameResult.AIP...)
@@ -124,5 +135,5 @@ func (r *Resolver) Query(host string, ipv6 bool, timeout time.Duration) (Result,
 		ctx = context.Background()
 	}
 
-	return r.qQery(host, ipv6, ctx)
+	return r.query(host, ipv6, ctx)
 }

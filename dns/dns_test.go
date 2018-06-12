@@ -1,17 +1,16 @@
 package dns
 
 import (
-	"fmt"
 	"testing"
+	"time"
 )
 
 func TestResolver_Query(t *testing.T) {
-	resolver := DefaultResolver
-	resolver.Server = "1.1.1.1:53"
+	resolver := NewResolver("114.114.114.114:53", "tcp", 10*time.Second)
 
-	if result, err := resolver.Query("www.baidu.com", true, -1); err != nil {
+	if result, err := resolver.Query("www.qq.com", true, 10*time.Second); err != nil {
 		t.Error(err)
 	} else {
-		fmt.Println(result)
+		t.Log(result)
 	}
 }

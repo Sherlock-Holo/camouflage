@@ -4,6 +4,8 @@ import (
 	"errors"
 	"io/ioutil"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/Unknwon/goconfig"
 )
@@ -33,6 +35,10 @@ type Server struct {
 
 	CrtFile string
 	KeyFile string
+
+	Net        string
+	DNS        string
+	DNSTimeout time.Duration
 }
 
 func ReadClient(cfgFile string) (Client, error) {
@@ -165,6 +171,30 @@ func ReadServer(cfgFile string) (Server, error) {
 		server.KeyFile = keyFile
 	} else {
 		return Server{}, errors.New("need key")
+	}
+
+	if dnsString, ok := section["dns"]; ok {
+		split := strings.Split(dnsString, "#")
+
+		switch strings.ToLower(split[0]) {
+		case "udp":
+			server.Net = "udp"
+		case "tcp":
+			server.Net = "tcp"
+		default:
+		}
+
+		if server.Net != "" {
+			server.DNS = split[1]
+		}
+	}
+
+	if dnsTimeout, ok := section["dns_timeout"]; ok {
+		if duration, err := time.ParseDuration(dnsTimeout + "s"); err != nil {
+			server.DNSTimeout = 10 * time.Second
+		} else {
+			server.DNSTimeout = duration
+		}
 	}
 
 	return server, nil

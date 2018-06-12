@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 
 	"github.com/Sherlock-Holo/camouflage/config"
+	"github.com/Sherlock-Holo/camouflage/dns"
 	websocket2 "github.com/Sherlock-Holo/goutils/websocket"
 	"github.com/Sherlock-Holo/libsocks"
 	"github.com/Sherlock-Holo/link"
@@ -17,11 +19,13 @@ import (
 )
 
 type Server struct {
-	server http.Server
-	config config.Server
+	server   http.Server
+	config   config.Server
+	resolver *dns.Resolver
 }
 
 type handler struct {
+	server   *Server
 	upgrader websocket.Upgrader
 }
 
@@ -48,16 +52,36 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		go handle(l)
+		go handle(h, l)
 	}
 }
 
-func handle(l *link.Link) {
+func handle(handler *handler, l *link.Link) {
 	address, err := libsocks.DecodeFrom(l)
 	if err != nil {
 		log.Println(err)
 		l.Close()
 		return
+	}
+
+	if handler.server.resolver != nil {
+		if address.Type == 3 {
+			result, err := handler.server.resolver.Query(address.Host, false, handler.server.config.DNSTimeout)
+			if err != nil {
+				log.Println(err)
+				l.Close()
+				return
+			}
+
+			if len(result.AIP) == 0 {
+				address.IP = result.AAAAIP[rand.Intn(len(result.AAAAIP))]
+				address.Type = 4
+			} else {
+				address.IP = result.AIP[rand.Intn(len(result.AIP))]
+				address.Type = 1
+			}
+
+		}
 	}
 
 	remote, err := net.Dial("tcp", address.String())
@@ -98,16 +122,26 @@ func NewServer(cfg config.Server) (*Server, error) {
 	pool := x509.NewCertPool()
 	pool.AppendCertsFromPEM(cfg.CA)
 
+	handler := new(handler)
+
 	server := &Server{
 		server: http.Server{
 			Addr:    fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.BindPort),
-			Handler: new(handler),
+			Handler: handler,
 			TLSConfig: &tls.Config{
 				ClientCAs:  pool,
 				ClientAuth: tls.RequireAndVerifyClientCert,
 			},
 		},
+
 		config: cfg,
+	}
+
+	handler.server = server
+
+	if cfg.DNS != "" {
+		resolver := dns.NewResolver(cfg.DNS, cfg.Net, cfg.DNSTimeout)
+		server.resolver = &resolver
 	}
 
 	return server, nil
