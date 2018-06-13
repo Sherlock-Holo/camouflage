@@ -23,6 +23,8 @@ type Client struct {
 
 	CrtFile string
 	KeyFile string
+
+	MaxLinks int
 }
 
 type Server struct {
@@ -111,6 +113,14 @@ func ReadClient(cfgFile string) (Client, error) {
 		client.KeyFile = keyFile
 	} else {
 		return Client{}, errors.New("need key")
+	}
+
+	if maxLinksString, ok := section["max_links"]; ok {
+		if maxLinks, err := strconv.Atoi(maxLinksString); err != nil {
+			client.MaxLinks = 100
+		} else {
+			client.MaxLinks = maxLinks
+		}
 	}
 
 	return client, nil
