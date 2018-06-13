@@ -3,7 +3,6 @@ package client
 import (
 	"container/heap"
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"io"
 	"log"
@@ -12,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Sherlock-Holo/camouflage/ca"
 	"github.com/Sherlock-Holo/camouflage/config"
 	websocket2 "github.com/Sherlock-Holo/goutils/websocket"
 	"github.com/Sherlock-Holo/libsocks"
@@ -86,13 +86,18 @@ func NewClient(cfg config.Client) (*Client, error) {
 		Path:   cfg.Path,
 	}).String()
 
-	pool := x509.NewCertPool()
+	/*pool := x509.NewCertPool()
 
-	pool.AppendCertsFromPEM(cfg.CA)
+	pool.AppendCertsFromPEM(cfg.CA)*/
 
 	certificate, err := tls.LoadX509KeyPair(cfg.CrtFile, cfg.KeyFile)
 	if err != nil {
 		return nil, err
+	}
+
+	pool, err := ca.InitCAPool(cfg.CA)
+	if err != nil {
+		return nil, fmt.Errorf("Init CA Pool: %s\n", err)
 	}
 
 	dialer := websocket.Dialer{
