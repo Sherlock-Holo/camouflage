@@ -178,6 +178,10 @@ func (c *Client) handle(conn net.Conn) {
 			count:   1,
 			usable:  true,
 		}
+
+		c.poolLock.Lock()
+		heap.Push(c.managerPool, status)
+		c.poolLock.Unlock()
 	}
 
 	localAddr := conn.LocalAddr().(*net.TCPAddr)
@@ -192,15 +196,12 @@ func (c *Client) handle(conn net.Conn) {
 		if inPool {
 			c.poolLock.Lock()
 			heap.Remove(c.managerPool, status.index)
+			// log.Println("heap size", c.managerPool.Len())
 			c.poolLock.Unlock()
 		}
 
 		return
 	}
-
-	c.poolLock.Lock()
-	heap.Push(c.managerPool, status)
-	c.poolLock.Unlock()
 
 	if _, err := l.Write(socks.Target.Bytes()); err != nil {
 		log.Println("send target:", err)
