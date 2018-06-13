@@ -127,6 +127,18 @@ func (r *Resolver) query(host string, ipv6 bool, ctx context.Context) (Result, e
 }
 
 func (r *Resolver) Query(host string, ipv6 bool, timeout time.Duration) (result Result, err error) {
+	if ip := net.ParseIP(host); ip != nil {
+		if len(ip) == 4 {
+			return Result{
+				AIP: []net.IP{ip},
+			}, nil
+		} else {
+			return Result{
+				AAAAIP: []net.IP{ip},
+			}, nil
+		}
+	}
+
 	var ctx context.Context
 
 	if timeout > 0 {
