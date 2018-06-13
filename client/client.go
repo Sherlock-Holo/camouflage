@@ -19,7 +19,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const maxLinks = 200
+// const maxLinks = 200
 
 type managerStatus struct {
 	manager *link.Manager
@@ -69,6 +69,8 @@ type Client struct {
 	managerPool *managerHeap
 	poolLock    sync.Mutex
 
+	maxLinks int
+
 	dialer websocket.Dialer
 }
 
@@ -107,6 +109,8 @@ func NewClient(cfg config.Client) (*Client, error) {
 
 		managerPool: new(managerHeap),
 
+		maxLinks: cfg.MaxLinks,
+
 		dialer: dialer,
 	}, nil
 }
@@ -129,7 +133,7 @@ func (c *Client) handle(conn net.Conn) {
 	socks, err := libsocks.NewSocks(conn, nil)
 	if err != nil {
 		log.Println("new socks:", err)
-		socks.Close()
+		// socks.Close()
 		return
 	}
 
@@ -147,7 +151,7 @@ func (c *Client) handle(conn net.Conn) {
 			continue
 		}
 
-		if st.count >= maxLinks {
+		if st.count >= int32(c.maxLinks) {
 			heap.Push(c.managerPool, st)
 			break
 		}
@@ -293,6 +297,7 @@ func (c *Client) clean() {
 		<-ticker.C
 
 		c.poolLock.Lock()
+		var cleaned int
 		for {
 			if c.managerPool.Len() <= 2 {
 				break
@@ -303,7 +308,10 @@ func (c *Client) clean() {
 				break
 			}
 			status.manager.Close()
-			log.Println("clean a useless manager")
+			cleaned++
+		}
+		if cleaned > 0 {
+			log.Printf("clean %d useless manager(s)", cleaned)
 		}
 
 		c.poolLock.Unlock()
