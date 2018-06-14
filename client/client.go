@@ -86,10 +86,6 @@ func NewClient(cfg config.Client) (*Client, error) {
 		Path:   cfg.Path,
 	}).String()
 
-	/*pool := x509.NewCertPool()
-
-	pool.AppendCertsFromPEM(cfg.CA)*/
-
 	certificate, err := tls.LoadX509KeyPair(cfg.CrtFile, cfg.KeyFile)
 	if err != nil {
 		return nil, err
@@ -198,12 +194,15 @@ func (c *Client) handle(conn net.Conn) {
 		socks.Close()
 		status.manager.Close()
 
-		if inPool {
+		/*if inPool {
 			c.poolLock.Lock()
 			heap.Remove(c.managerPool, status.index)
 			// log.Println("heap size", c.managerPool.Len())
 			c.poolLock.Unlock()
-		}
+		}*/
+		c.poolLock.Lock()
+		heap.Remove(c.managerPool, status.index)
+		c.poolLock.Unlock()
 
 		return
 	}
