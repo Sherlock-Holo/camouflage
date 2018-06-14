@@ -1,0 +1,10 @@
+[Unit]
+Description=Camouflage client service
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/camouflage -client /etc/camouflage/%i
+MemoryAccounting=true
+
+[Install]
+WantedBy=multi-user.target

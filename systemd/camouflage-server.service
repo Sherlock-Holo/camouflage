@@ -1,0 +1,10 @@
+[Unit]
+Description=Camouflage server service
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/camouflage -server /etc/camouflage/%i
+MemoryAccounting=true
+
+[Install]
+WantedBy=multi-user.target
