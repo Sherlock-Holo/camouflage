@@ -41,6 +41,7 @@ type Server struct {
 	Net        string
 	DNS        string
 	DNSTimeout time.Duration
+	PreferIPv6 bool
 }
 
 func ReadClient(cfgFile string) (Client, error) {
@@ -204,6 +205,12 @@ func ReadServer(cfgFile string) (Server, error) {
 			server.DNSTimeout = 10 * time.Second
 		} else {
 			server.DNSTimeout = duration
+		}
+	}
+
+	if ipv6, ok := section["prefer_ipv6"]; ok {
+		if strings.ToLower(ipv6) == "true" {
+			server.PreferIPv6 = true
 		}
 	}
 

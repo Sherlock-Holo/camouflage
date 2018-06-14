@@ -66,19 +66,31 @@ func handle(handler *handler, l *link.Link) {
 
 	if handler.server.resolver != nil {
 		if address.Type == 3 {
-			result, err := handler.server.resolver.Query(address.Host, false, handler.server.config.DNSTimeout)
+			result, err := handler.server.resolver.Query(address.Host, handler.server.config.PreferIPv6, handler.server.config.DNSTimeout)
 			if err != nil {
 				log.Println(err)
 				l.Close()
 				return
 			}
 
-			if len(result.AIP) == 0 {
-				address.IP = result.AAAAIP[rand.Intn(len(result.AAAAIP))]
-				address.Type = 4
+			if handler.server.config.PreferIPv6 {
+				if len(result.AAAAIP) > 0 {
+					address.IP = result.AAAAIP[rand.Intn(len(result.AAAAIP))]
+					address.Type = 4
+				} else {
+					address.IP = result.AIP[rand.Intn(len(result.AIP))]
+					address.Type = 1
+				}
+
 			} else {
-				address.IP = result.AIP[rand.Intn(len(result.AIP))]
-				address.Type = 1
+				if len(result.AIP) > 0 {
+					address.IP = result.AIP[rand.Intn(len(result.AIP))]
+					address.Type = 1
+
+				} else {
+					address.IP = result.AAAAIP[rand.Intn(len(result.AAAAIP))]
+					address.Type = 4
+				}
 			}
 
 		}
