@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"io/ioutil"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -94,6 +95,10 @@ func ReadClient(cfgFile string) (Client, error) {
 	}
 
 	if caFile, ok := section["ca_crt"]; ok {
+		if !strings.HasPrefix(caFile, "/") {
+			caFile = filepath.Dir(cfgFile) + "/" + caFile
+		}
+
 		ca, err := ioutil.ReadFile(caFile)
 		if err != nil {
 			return Client{}, err
@@ -105,12 +110,18 @@ func ReadClient(cfgFile string) (Client, error) {
 	}
 
 	if crtFile, ok := section["crt"]; ok {
+		if !strings.HasPrefix(crtFile, "/") {
+			crtFile = filepath.Dir(cfgFile) + "/" + crtFile
+		}
 		client.CrtFile = crtFile
 	} else {
 		return Client{}, errors.New("need crt")
 	}
 
 	if keyFile, ok := section["key"]; ok {
+		if !strings.HasPrefix(keyFile, "/") {
+			keyFile = filepath.Dir(cfgFile) + "/" + keyFile
+		}
 		client.KeyFile = keyFile
 	} else {
 		return Client{}, errors.New("need key")
@@ -162,6 +173,9 @@ func ReadServer(cfgFile string) (Server, error) {
 	}
 
 	if caFile, ok := section["ca_crt"]; ok {
+		if !strings.HasPrefix(caFile, "/") {
+			caFile = filepath.Dir(cfgFile) + "/" + caFile
+		}
 		ca, err := ioutil.ReadFile(caFile)
 		if err != nil {
 			return Server{}, err
@@ -173,12 +187,18 @@ func ReadServer(cfgFile string) (Server, error) {
 	}
 
 	if crtFile, ok := section["crt"]; ok {
+		if !strings.HasPrefix(crtFile, "/") {
+			crtFile = filepath.Dir(cfgFile) + "/" + crtFile
+		}
 		server.CrtFile = crtFile
 	} else {
 		return Server{}, errors.New("need crt")
 	}
 
 	if keyFile, ok := section["key"]; ok {
+		if !strings.HasPrefix(keyFile, "/") {
+			keyFile = filepath.Dir(cfgFile) + "/" + keyFile
+		}
 		server.KeyFile = keyFile
 	} else {
 		return Server{}, errors.New("need key")
