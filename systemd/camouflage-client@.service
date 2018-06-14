@@ -3,7 +3,7 @@ Description=Camouflage client service
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/camouflage -client /etc/camouflage/%i
+ExecStart=/usr/bin/camouflage -client /etc/camouflage/%i.conf
 MemoryAccounting=true
 
 [Install]
