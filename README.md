@@ -1,5 +1,5 @@
 # camouflage
-an experimental project
+a mux websocket+TLS proxy
 
 ## Usage
 1. edit script/server.cnf, edit the last 2 lines if you don't know how to custom it.
