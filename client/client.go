@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/url"
+	"strconv"
 	"sync"
 	"time"
 
@@ -82,7 +83,7 @@ func NewClient(cfg config.Client) (*Client, error) {
 
 	wsURL := (&url.URL{
 		Scheme: "wss",
-		Host:   net.JoinHostPort(cfg.RemoteAddr, string(cfg.RemotePort)),
+		Host:   net.JoinHostPort(cfg.RemoteAddr, strconv.Itoa(cfg.RemotePort)),
 		Path:   cfg.Path,
 	}).String()
 
