@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -19,9 +20,8 @@ import (
 )
 
 type Server struct {
-	server   http.Server
-	config   config.Server
-	resolver *dns.Resolver
+	server http.Server
+	config config.Server
 }
 
 type handler struct {
@@ -64,35 +64,43 @@ func handle(handler *handler, l *link.Link) {
 		return
 	}
 
-	if handler.server.resolver != nil {
+	if handler.server.config.DNS != "" {
 		if address.Type == 3 {
-			result, err := handler.server.resolver.Query(address.Host, handler.server.config.PreferIPv6, handler.server.config.DNSTimeout)
-			if err != nil {
+			ctx, _ := context.WithTimeout(context.Background(), handler.server.config.DNSTimeout)
+			if addrs, err := dns.Resolver.LookupIPAddr(ctx, address.Host); err == nil {
+				if dns.HasPublicIPv6() {
+					ip := addrs[rand.Intn(len(addrs))].IP
+					if ip.To4() != nil {
+						address.Type = 1
+						address.IP = ip.To4()
+					} else {
+						address.Type = 4
+						address.IP = ip
+					}
+
+				} else {
+					var v4s []net.IP
+					for _, ip := range addrs {
+						if v4 := ip.IP.To4(); v4 != nil {
+							v4s = append(v4s, v4)
+						}
+					}
+
+					if v4s == nil {
+						log.Println("interfaces only have IPv4 address but DNS resolve result doesn't have IPv4")
+						l.Close()
+						return
+					}
+
+					ip := v4s[rand.Intn(len(v4s))]
+					address.Type = 1
+					address.IP = ip
+				}
+			} else {
 				log.Println(err)
 				l.Close()
 				return
 			}
-
-			if handler.server.config.PreferIPv6 {
-				if len(result.AAAAIP) > 0 {
-					address.IP = result.AAAAIP[rand.Intn(len(result.AAAAIP))]
-					address.Type = 4
-				} else {
-					address.IP = result.AIP[rand.Intn(len(result.AIP))]
-					address.Type = 1
-				}
-
-			} else {
-				if len(result.AIP) > 0 {
-					address.IP = result.AIP[rand.Intn(len(result.AIP))]
-					address.Type = 1
-
-				} else {
-					address.IP = result.AAAAIP[rand.Intn(len(result.AAAAIP))]
-					address.Type = 4
-				}
-			}
-
 		}
 	}
 
@@ -152,8 +160,9 @@ func NewServer(cfg config.Server) (*Server, error) {
 	handler.server = server
 
 	if cfg.DNS != "" {
-		resolver := dns.NewResolver(cfg.DNS, cfg.Net)
-		server.resolver = &resolver
+		dns.Resolver.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
+			return net.Dial(cfg.Net, cfg.DNS)
+		}
 	}
 
 	return server, nil

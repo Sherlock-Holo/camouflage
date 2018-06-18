@@ -82,7 +82,7 @@ func NewClient(cfg config.Client) (*Client, error) {
 
 	wsURL := (&url.URL{
 		Scheme: "wss",
-		Host:   fmt.Sprintf("%s:%d", cfg.RemoteAddr, cfg.RemotePort),
+		Host:   net.JoinHostPort(cfg.RemoteAddr, string(cfg.RemotePort)),
 		Path:   cfg.Path,
 	}).String()
 
@@ -194,12 +194,6 @@ func (c *Client) handle(conn net.Conn) {
 		socks.Close()
 		status.manager.Close()
 
-		/*if inPool {
-			c.poolLock.Lock()
-			heap.Remove(c.managerPool, status.index)
-			// log.Println("heap size", c.managerPool.Len())
-			c.poolLock.Unlock()
-		}*/
 		c.poolLock.Lock()
 		if status.index != -1 {
 			heap.Remove(c.managerPool, status.index)
