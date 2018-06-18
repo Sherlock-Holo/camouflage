@@ -176,7 +176,7 @@ func (c *Client) handle(conn net.Conn) {
 		}
 
 		status = &managerStatus{
-			manager: link.NewManager(websocket2.NewWrapper(conn)),
+			manager: link.NewManager(websocket2.NewWrapper(conn), nil),
 			count:   1,
 			usable:  true,
 		}
