@@ -201,7 +201,10 @@ func (c *Client) handle(conn net.Conn) {
 			c.poolLock.Unlock()
 		}*/
 		c.poolLock.Lock()
-		heap.Remove(c.managerPool, status.index)
+		if status.index != -1 {
+			heap.Remove(c.managerPool, status.index)
+			status.index = -1
+		}
 		c.poolLock.Unlock()
 
 		return
