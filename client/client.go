@@ -175,8 +175,11 @@ func (c *Client) handle(conn net.Conn) {
 			return
 		}
 
+		defaultConfig := link.DefaultConfig
+		defaultConfig.Timeout = 0
+
 		status = &managerStatus{
-			manager: link.NewManager(websocket2.NewWrapper(conn), nil),
+			manager: link.NewManager(websocket2.NewWrapper(conn), defaultConfig),
 			count:   1,
 			usable:  true,
 		}
