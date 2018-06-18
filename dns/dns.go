@@ -1,160 +1,38 @@
 package dns
 
 import (
-	"context"
-	"errors"
+	net2 "github.com/Sherlock-Holo/goutils/net"
 	"net"
-	"sync"
-	"time"
-
-	"github.com/miekg/dns"
 )
 
-type Resolver struct {
-	Server string
-
-	client dns.Client
+var Resolver = net.Resolver{
+	PreferGo: true,
 }
 
-type Result struct {
-	AIP    []net.IP
-	AAAAIP []net.IP
+func HasPublicIPv6() bool {
+	addrs, _ := net.InterfaceAddrs()
 
-	aLock    sync.Mutex
-	aaaaLock sync.Mutex
-}
-
-var DefaultResolver = Resolver{
-	Server: "1.1.1.1:53",
-	client: dns.Client{
-		Timeout: 30 * time.Second,
-	},
-}
-
-func NewResolver(server string, net string) Resolver {
-	return Resolver{
-		Server: server,
-
-		client: dns.Client{
-			Net:     net,
-			Timeout: 5 * time.Second,
-		},
-	}
-}
-
-func (r *Resolver) query(host string, ipv6 bool, ctx context.Context) (Result, error) {
-	// TODO: edns client subnet
-
-	var msgs []*dns.Msg
-
-	msg := new(dns.Msg)
-	msg.Id = dns.Id()
-	msg.RecursionDesired = true
-	msg.Question = []dns.Question{
-		{
-			Name:   dns.Fqdn(host),
-			Qclass: dns.ClassINET,
-			Qtype:  dns.TypeA,
-		},
+	if addrs == nil {
+		return false
 	}
 
-	msgs = append(msgs, msg)
+	var v6Addrs []net.IP
 
-	if ipv6 {
-		v6Msg := new(dns.Msg)
-		v6Msg.Id = dns.Id()
-		v6Msg.RecursionDesired = true
-		v6Msg.Question = []dns.Question{
-			{
-				Name:   dns.Fqdn(host),
-				Qclass: dns.ClassINET,
-				Qtype:  dns.TypeAAAA,
-			},
-		}
-
-		msgs = append(msgs, v6Msg)
-	}
-
-	var (
-		result Result
-		group  = sync.WaitGroup{}
-	)
-
-	for _, msg := range msgs {
-		group.Add(1)
-		go func(msg *dns.Msg) {
-			defer group.Done()
-
-			rMsg, _, err := r.client.ExchangeContext(ctx, msg, r.Server)
-			if err != nil {
-				return
-			}
-
-			for _, an := range rMsg.Answer {
-				switch an := an.(type) {
-				case *dns.A:
-					result.aLock.Lock()
-					result.AIP = append(result.AIP, an.A)
-					result.aLock.Unlock()
-
-				case *dns.AAAA:
-					result.aaaaLock.Lock()
-					result.AAAAIP = append(result.AAAAIP, an.AAAA)
-					result.aaaaLock.Unlock()
-
-				case *dns.CNAME:
-					cnameResult, err := r.query(an.Target, ipv6, ctx)
-					if err == nil {
-						result.aLock.Lock()
-						result.AIP = append(result.AIP, cnameResult.AIP...)
-						result.aLock.Unlock()
-
-						result.aaaaLock.Lock()
-						result.AAAAIP = append(result.AAAAIP, cnameResult.AAAAIP...)
-						result.aaaaLock.Unlock()
-					}
-				}
-			}
-		}(msg)
-	}
-	group.Wait()
-
-	if len(result.AIP) == 0 && len(result.AAAAIP) == 0 {
-		return Result{}, errors.New("resolve failed")
-	}
-
-	return result, nil
-}
-
-func (r *Resolver) Query(host string, ipv6 bool, timeout time.Duration) (result Result, err error) {
-	if ip := net.ParseIP(host); ip != nil {
-		if len(ip) == 4 {
-			return Result{
-				AIP: []net.IP{ip},
-			}, nil
-		} else {
-			return Result{
-				AAAAIP: []net.IP{ip},
-			}, nil
+	for _, addr := range addrs {
+		if v6 := addr.(*net.IPNet).IP.To16(); v6 != nil {
+			v6Addrs = append(v6Addrs, v6)
 		}
 	}
 
-	var ctx context.Context
-
-	if timeout > 0 {
-		ctx, _ = context.WithTimeout(context.Background(), timeout)
-	} else {
-		ctx = context.Background()
+	if v6Addrs == nil {
+		return false
 	}
 
-	for i := 0; i < 16; i++ {
-		result, err = r.query(host, ipv6, ctx)
-		if err != nil {
-			continue
+	for _, v6 := range v6Addrs {
+		if net2.IsPublicIP(v6) {
+			return true
 		}
-
-		return
 	}
 
-	return
+	return false
 }
