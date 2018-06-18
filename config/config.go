@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Unknwon/goconfig"
 )
@@ -39,9 +38,8 @@ type Server struct {
 	CrtFile string
 	KeyFile string
 
-	Net        string
-	DNS        string
-	DNSTimeout time.Duration
+	Net string
+	DNS string
 }
 
 func ReadClient(cfgFile string) (Client, error) {
@@ -216,14 +214,6 @@ func ReadServer(cfgFile string) (Server, error) {
 
 		if server.Net != "" {
 			server.DNS = split[1]
-		}
-	}
-
-	if dnsTimeout, ok := section["dns_timeout"]; ok {
-		if duration, err := time.ParseDuration(dnsTimeout + "s"); err != nil {
-			server.DNSTimeout = 10 * time.Second
-		} else {
-			server.DNSTimeout = duration
 		}
 	}
 

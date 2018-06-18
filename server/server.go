@@ -66,8 +66,7 @@ func handle(handler *handler, l *link.Link) {
 
 	if handler.server.config.DNS != "" {
 		if address.Type == 3 {
-			ctx, _ := context.WithTimeout(context.Background(), handler.server.config.DNSTimeout)
-			if addrs, err := dns.Resolver.LookupIPAddr(ctx, address.Host); err == nil {
+			if addrs, err := dns.Resolver.LookupIPAddr(context.Background(), address.Host); err == nil {
 				if dns.HasPublicIPv6() {
 					ip := addrs[rand.Intn(len(addrs))].IP
 					if ip.To4() != nil {
@@ -97,7 +96,7 @@ func handle(handler *handler, l *link.Link) {
 					address.IP = ip
 				}
 			} else {
-				log.Println(err)
+				log.Println("resolve DNS", err)
 				l.Close()
 				return
 			}
