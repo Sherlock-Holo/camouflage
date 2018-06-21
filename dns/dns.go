@@ -1,8 +1,9 @@
 package dns
 
 import (
-	net2 "github.com/Sherlock-Holo/goutils/net"
 	"net"
+
+	net2 "github.com/Sherlock-Holo/goutils/net"
 )
 
 var Resolver = net.Resolver{
