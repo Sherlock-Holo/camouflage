@@ -42,7 +42,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	manager := link.NewManager(websocket2.NewWrapper(conn), nil)
+	manager := link.NewManager(websocket2.NewWrapper(conn), link.KeepaliveConfig)
 
 	for {
 		l, err := manager.Accept()
