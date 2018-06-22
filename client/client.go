@@ -25,7 +25,8 @@ import (
 type managerStatus struct {
 	manager *link.Manager
 	count   int32
-	usable  bool
+
+	closed chan struct{}
 
 	index int
 }
@@ -149,9 +150,11 @@ func (c *Client) handle(conn net.Conn) {
 	c.poolLock.Lock()
 	for c.managerPool.Len() > 0 {
 		st := heap.Pop(c.managerPool).(*managerStatus)
-		if !st.usable {
-			go st.manager.Close()
+		select {
+		case <-st.closed:
+			// go st.manager.Close()
 			continue
+		default:
 		}
 
 		if st.count >= int32(c.maxLinks) {
@@ -179,7 +182,7 @@ func (c *Client) handle(conn net.Conn) {
 		status = &managerStatus{
 			manager: link.NewManager(websocket2.NewWrapper(conn), link.KeepaliveConfig),
 			count:   1,
-			usable:  true,
+			closed:  make(chan struct{}),
 		}
 
 		c.poolLock.Lock()
@@ -195,7 +198,12 @@ func (c *Client) handle(conn net.Conn) {
 		socks.Reply(socksLocalAddr.IP, uint16(socksLocalAddr.Port), libsocks.ServerFailed)
 		socks.Close()
 
-		status.usable = false
+		select {
+		case <-status.closed:
+		default:
+			close(status.closed)
+		}
+
 		status.manager.Close()
 
 		// manager is found error at the first time
