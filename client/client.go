@@ -150,6 +150,7 @@ func (c *Client) handle(conn net.Conn) {
 	for c.managerPool.Len() > 0 {
 		st := heap.Pop(c.managerPool).(*managerStatus)
 		if !st.usable {
+			go st.manager.Close()
 			continue
 		}
 
@@ -193,14 +194,17 @@ func (c *Client) handle(conn net.Conn) {
 		log.Println("newLink:", err)
 		socks.Reply(socksLocalAddr.IP, uint16(socksLocalAddr.Port), libsocks.ServerFailed)
 		socks.Close()
+
+		status.usable = false
 		status.manager.Close()
 
-		c.poolLock.Lock()
+		// manager is found error at the first time
 		if status.index != -1 {
+			c.poolLock.Lock()
 			heap.Remove(c.managerPool, status.index)
 			status.index = -1
+			c.poolLock.Unlock()
 		}
-		c.poolLock.Unlock()
 
 		return
 	}
@@ -276,12 +280,13 @@ func (c *Client) handle(conn net.Conn) {
 	for i := 0; i < 2; i++ {
 		select {
 		case <-die:
-			c.poolLock.Lock()
+			/*c.poolLock.Lock()
 			status.count--
 			heap.Fix(c.managerPool, status.index)
 			c.poolLock.Unlock()
 
-			return
+			return*/
+			break
 
 		case <-closeCount:
 		}
@@ -294,7 +299,7 @@ func (c *Client) handle(conn net.Conn) {
 }
 
 func (c *Client) clean() {
-	ticker := time.NewTicker(time.Minute)
+	ticker := time.NewTicker(15 * time.Second)
 
 	for {
 		<-ticker.C
@@ -302,7 +307,7 @@ func (c *Client) clean() {
 		c.poolLock.Lock()
 		var cleaned int
 		for {
-			if c.managerPool.Len() <= 2 {
+			if c.managerPool.Len() <= 1 {
 				break
 			}
 
