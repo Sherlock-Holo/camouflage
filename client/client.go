@@ -288,12 +288,6 @@ func (c *Client) handle(conn net.Conn) {
 	for i := 0; i < 2; i++ {
 		select {
 		case <-die:
-			/*c.poolLock.Lock()
-			status.count--
-			heap.Fix(c.managerPool, status.index)
-			c.poolLock.Unlock()
-
-			return*/
 			break
 
 		case <-closeCount:
@@ -323,7 +317,7 @@ func (c *Client) clean() {
 			if status.count != 0 {
 				break
 			}
-			status.manager.Close()
+			go status.manager.Close()
 			cleaned++
 		}
 		if cleaned > 0 {
