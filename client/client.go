@@ -20,8 +20,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// const maxLinks = 200
-
 type managerStatus struct {
 	manager *link.Manager
 	count   int32
