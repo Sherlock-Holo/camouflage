@@ -134,7 +134,7 @@ func (c *Client) handle(conn net.Conn) {
 	socks, err := libsocks.NewSocks(conn, nil)
 	if err != nil {
 		log.Println("new socks:", err)
-		// socks.Close()
+		conn.Close()
 		return
 	}
 
