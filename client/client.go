@@ -301,11 +301,16 @@ func (c *Client) handle(conn net.Conn) {
 func (c *Client) clean() {
 	ticker := time.NewTicker(15 * time.Second)
 
+	var tmp []*managerStatus
+
 	for {
 		<-ticker.C
 
+		tmp = tmp[0:0]
+
 		c.poolLock.Lock()
 		var cleaned int
+
 		for {
 			if c.managerPool.Len() <= 1 {
 				break
@@ -323,9 +328,14 @@ func (c *Client) clean() {
 				go status.manager.Close()
 
 			default:
-				heap.Push(c.managerPool, status)
+				tmp = append(tmp, status)
 			}
 		}
+
+		for _, status := range tmp {
+			heap.Push(c.managerPool, status)
+		}
+
 		c.poolLock.Unlock()
 
 		if cleaned > 0 {
