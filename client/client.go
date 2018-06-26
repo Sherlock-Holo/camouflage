@@ -311,17 +311,25 @@ func (c *Client) clean() {
 				break
 			}
 
-			status := c.managerPool.Pop().(*managerStatus)
-			if status.count != 0 {
-				break
+			status := heap.Pop(c.managerPool).(*managerStatus)
+
+			switch {
+			case status.count == 0:
+				cleaned++
+				go status.manager.Close()
+
+			case status.manager.IsClosed():
+				cleaned++
+				go status.manager.Close()
+
+			default:
+				heap.Push(c.managerPool, status)
 			}
-			go status.manager.Close()
-			cleaned++
 		}
+		c.poolLock.Unlock()
+
 		if cleaned > 0 {
 			log.Printf("clean %d useless manager(s)", cleaned)
 		}
-
-		c.poolLock.Unlock()
 	}
 }
