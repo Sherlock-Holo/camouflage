@@ -3,6 +3,7 @@ package client
 import (
 	"container/heap"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -140,78 +141,11 @@ func (c *Client) handle(conn net.Conn) {
 
 	socksLocalAddr := socks.LocalAddr().(*net.TCPAddr)
 
-	var (
-		status *managerStatus
-		inPool bool
-	)
-
-	c.poolLock.Lock()
-	for c.managerPool.Len() > 0 {
-		st := heap.Pop(c.managerPool).(*managerStatus)
-		select {
-		case <-st.closed:
-			// go st.manager.Close()
-			continue
-		default:
-		}
-
-		if st.count >= int32(c.maxLinks) {
-			heap.Push(c.managerPool, st)
-			break
-		}
-
-		status = st
-		status.count++
-		heap.Push(c.managerPool, status)
-		inPool = true
-		break
-	}
-	c.poolLock.Unlock()
-
-	if !inPool {
-		conn, _, err := c.dialer.Dial(c.wsURL, nil)
-		if err != nil {
-			log.Println("dial websocket:", err)
-			socks.Reply(socksLocalAddr.IP, uint16(socksLocalAddr.Port), libsocks.NetworkUnreachable)
-			socks.Close()
-			return
-		}
-
-		status = &managerStatus{
-			manager: link.NewManager(websocket2.NewWrapper(conn), link.KeepaliveConfig),
-			count:   1,
-			closed:  make(chan struct{}),
-		}
-
-		c.poolLock.Lock()
-		heap.Push(c.managerPool, status)
-		c.poolLock.Unlock()
-	}
-
-	localAddr := conn.LocalAddr().(*net.TCPAddr)
-
-	l, err := status.manager.NewLink()
+	l, status, err := c.newLink()
 	if err != nil {
-		log.Println("newLink:", err)
+		log.Println(err)
 		socks.Reply(socksLocalAddr.IP, uint16(socksLocalAddr.Port), libsocks.ServerFailed)
 		socks.Close()
-
-		select {
-		case <-status.closed:
-		default:
-			close(status.closed)
-		}
-
-		status.manager.Close()
-
-		// manager is found error at the first time
-		if status.index != -1 {
-			c.poolLock.Lock()
-			heap.Remove(c.managerPool, status.index)
-			status.index = -1
-			c.poolLock.Unlock()
-		}
-
 		return
 	}
 
@@ -228,6 +162,8 @@ func (c *Client) handle(conn net.Conn) {
 
 		return
 	}
+
+	localAddr := conn.LocalAddr().(*net.TCPAddr)
 
 	// socks reply
 	if err := socks.Reply(localAddr.IP, uint16(localAddr.Port), libsocks.Success); err != nil {
@@ -342,4 +278,76 @@ func (c *Client) clean() {
 			log.Printf("clean %d useless manager(s)", cleaned)
 		}
 	}
+}
+
+func (c *Client) newLink() (*link.Link, *managerStatus, error) {
+	return c.realNewLink(1)
+}
+
+func (c *Client) realNewLink(count int) (*link.Link, *managerStatus, error) {
+	if count >= 10 {
+		return nil, nil, errors.New("new Link failed")
+	}
+
+	c.poolLock.Lock()
+	for c.managerPool.Len() > 0 {
+		status := heap.Pop(c.managerPool).(*managerStatus)
+
+		select {
+		case <-status.closed:
+			continue
+		default:
+		}
+
+		if status.count >= int32(c.maxLinks) {
+			heap.Push(c.managerPool, status)
+			break
+		}
+
+		status.count++
+		heap.Push(c.managerPool, status)
+		c.poolLock.Unlock()
+
+		l, err := status.manager.NewLink()
+		if err != nil {
+			c.poolLock.Lock()
+			go status.manager.Close()
+
+			select {
+			case <-status.closed:
+			default:
+				close(status.closed)
+			}
+
+			heap.Remove(c.managerPool, status.index)
+			return c.realNewLink(count + 1)
+		}
+
+		return l, status, nil
+	}
+	c.poolLock.Unlock()
+
+	conn, _, err := c.dialer.Dial(c.wsURL, nil)
+	if err != nil {
+		return c.realNewLink(count + 1)
+	}
+
+	status := &managerStatus{
+		manager: link.NewManager(websocket2.NewWrapper(conn), link.KeepaliveConfig),
+		count:   1,
+		closed:  make(chan struct{}),
+	}
+
+	l, err := status.manager.NewLink()
+	if err != nil {
+		go status.manager.Close()
+		close(status.closed)
+		return c.realNewLink(count + 1)
+	}
+
+	c.poolLock.Lock()
+	heap.Push(c.managerPool, status)
+	c.poolLock.Unlock()
+
+	return l, status, nil
 }
