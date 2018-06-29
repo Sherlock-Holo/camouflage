@@ -278,10 +278,12 @@ func (c *Client) clean() {
 			}
 		}
 
-		pool := managerHeap(tmp)
-		c.managerPool = &pool
+		if tmp != nil {
+			pool := managerHeap(tmp)
+			c.managerPool = &pool
 
-		heap.Init(c.managerPool)
+			heap.Init(c.managerPool)
+		}
 
 		c.poolLock.Unlock()
 
