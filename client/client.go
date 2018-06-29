@@ -249,12 +249,10 @@ func (c *Client) handle(conn net.Conn) {
 func (c *Client) clean() {
 	ticker := time.NewTicker(15 * time.Second)
 
-	var tmp []*managerStatus
-
 	for {
 		<-ticker.C
 
-		tmp = tmp[0:0]
+		var tmp []*managerStatus
 
 		c.poolLock.Lock()
 		var cleaned int
@@ -280,9 +278,10 @@ func (c *Client) clean() {
 			}
 		}
 
-		for _, status := range tmp {
-			heap.Push(c.managerPool, status)
-		}
+		pool := managerHeap(tmp)
+		c.managerPool = &pool
+
+		heap.Init(c.managerPool)
 
 		c.poolLock.Unlock()
 
