@@ -187,8 +187,7 @@ func (c *Client) handle(conn net.Conn) {
 	go func() {
 		if _, err := io.Copy(l, socks); err != nil {
 			log.Println(err)
-			socks.Close()
-			l.Close()
+
 			select {
 			case <-die:
 			default:
@@ -205,8 +204,7 @@ func (c *Client) handle(conn net.Conn) {
 	go func() {
 		if _, err := io.Copy(socks, l); err != nil {
 			log.Println(err)
-			socks.Close()
-			l.Close()
+
 			select {
 			case <-die:
 			default:
@@ -228,9 +226,23 @@ func (c *Client) handle(conn net.Conn) {
 		}
 	}
 
+	socks.Close()
+	l.Close()
+
 	c.poolLock.Lock()
+	if status.manager.IsClosed() {
+		select {
+		case <-status.closed:
+		default:
+			close(status.closed)
+		}
+
+		heap.Remove(c.managerPool, status.index)
+	}
+
 	status.count--
 	heap.Fix(c.managerPool, status.index)
+
 	c.poolLock.Unlock()
 }
 
