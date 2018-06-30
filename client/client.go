@@ -156,8 +156,12 @@ func (c *Client) handle(conn net.Conn) {
 		l.Close()
 
 		c.poolLock.Lock()
-		status.count--
-		heap.Fix(c.managerPool, status.index)
+		select {
+		case <-status.closed:
+		default:
+			status.count--
+			heap.Fix(c.managerPool, status.index)
+		}
 		c.poolLock.Unlock()
 
 		return
@@ -172,8 +176,12 @@ func (c *Client) handle(conn net.Conn) {
 		l.Close()
 
 		c.poolLock.Lock()
-		status.count--
-		heap.Fix(c.managerPool, status.index)
+		select {
+		case <-status.closed:
+		default:
+			status.count--
+			heap.Fix(c.managerPool, status.index)
+		}
 		c.poolLock.Unlock()
 
 		return
@@ -230,17 +238,9 @@ func (c *Client) handle(conn net.Conn) {
 	l.Close()
 
 	c.poolLock.Lock()
-	if status.manager.IsClosed() {
-		select {
-		case <-status.closed:
-		default:
-			close(status.closed)
-		}
-
-		if status.index != -1 {
-			heap.Remove(c.managerPool, status.index)
-		}
-	} else {
+	select {
+	case <-status.closed:
+	default:
 		status.count--
 		heap.Fix(c.managerPool, status.index)
 	}
