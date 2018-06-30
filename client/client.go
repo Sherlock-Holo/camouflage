@@ -240,10 +240,10 @@ func (c *Client) handle(conn net.Conn) {
 		if status.index != -1 {
 			heap.Remove(c.managerPool, status.index)
 		}
+	} else {
+		status.count--
+		heap.Fix(c.managerPool, status.index)
 	}
-
-	status.count--
-	heap.Fix(c.managerPool, status.index)
 
 	c.poolLock.Unlock()
 }
