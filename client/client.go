@@ -334,10 +334,8 @@ func (c *Client) realNewLink(count int) (*link.Link, *managerStatus, error) {
 				close(status.closed)
 			}
 
-			c.poolLock.Lock()
-			if status.index != -1 {
-				heap.Remove(c.managerPool, status.index)
-			}
+			heap.Remove(c.managerPool, status.index)
+
 			c.poolLock.Unlock()
 
 			return c.realNewLink(count + 1)
