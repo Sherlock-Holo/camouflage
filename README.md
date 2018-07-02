@@ -9,12 +9,9 @@ a mux websocket+TLS proxy
 
 ## Windows support
 because of go problems, in windows system I can't use `x509.SystemCertPool()`, so if you want to compile windows version, you can download 
-> https://fars.ee/DYxQ
+> https://gist.github.com/Sherlock-Holo/802a67a2beb9de480aef39bbf2953c8f
 
 and rename as `rootCA_windows.go` and then put it in `camouflage/ca` directory. So you can compile on windows now.
-
-this file sha256sum is 
-> 8d2f07e25a2e235da5e5a0008d03389de435b2c86b3e6ae87db3e628c73d2316
 
 ## Notice
 If you want to use camouflage, please make sure the dep [link](https://github.com/Sherlock-Holo/link) is the least version to enjoy the fast speed and good stability.
