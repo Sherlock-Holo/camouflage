@@ -115,18 +115,14 @@ func (c *Client) handle(conn net.Conn) {
 		socks.Close()
 		l.Close()
 
-		c.poolLock.Lock()
-		/*select {
-		case <-status.closed:
-		default:
-			status.count--
-			heap.Fix(c.managerPool, status.index)
-		}*/
 		if atomic.CompareAndSwapInt32(&status.closed, 0, 0) {
+			c.poolLock.Lock()
+
 			status.count--
 			heap.Fix(c.managerPool, status.index)
+
+			c.poolLock.Unlock()
 		}
-		c.poolLock.Unlock()
 
 		return
 	}
@@ -139,18 +135,14 @@ func (c *Client) handle(conn net.Conn) {
 		socks.Close()
 		l.Close()
 
-		c.poolLock.Lock()
-		/*select {
-		case <-status.closed:
-		default:
-			status.count--
-			heap.Fix(c.managerPool, status.index)
-		}*/
 		if atomic.CompareAndSwapInt32(&status.closed, 0, 0) {
+			c.poolLock.Lock()
+
 			status.count--
 			heap.Fix(c.managerPool, status.index)
+
+			c.poolLock.Unlock()
 		}
-		c.poolLock.Unlock()
 
 		return
 	}
@@ -158,6 +150,7 @@ func (c *Client) handle(conn net.Conn) {
 	var (
 		closeCount = make(chan struct{}, 2)
 		die        = make(chan struct{})
+		once       = sync.Once{}
 	)
 
 	go func() {
@@ -167,7 +160,9 @@ func (c *Client) handle(conn net.Conn) {
 			select {
 			case <-die:
 			default:
-				close(die)
+				once.Do(func() {
+					close(die)
+				})
 			}
 			return
 		}
@@ -184,7 +179,9 @@ func (c *Client) handle(conn net.Conn) {
 			select {
 			case <-die:
 			default:
-				close(die)
+				once.Do(func() {
+					close(die)
+				})
 			}
 			return
 		}
@@ -205,19 +202,14 @@ func (c *Client) handle(conn net.Conn) {
 	socks.Close()
 	l.Close()
 
-	c.poolLock.Lock()
-	/*select {
-	case <-status.closed:
-	default:
-		status.count--
-		heap.Fix(c.managerPool, status.index)
-	}*/
 	if atomic.CompareAndSwapInt32(&status.closed, 0, 0) {
+		c.poolLock.Lock()
+
 		status.count--
 		heap.Fix(c.managerPool, status.index)
-	}
 
-	c.poolLock.Unlock()
+		c.poolLock.Unlock()
+	}
 }
 
 func (c *Client) clean() {
@@ -280,11 +272,6 @@ func (c *Client) realNewLink(count int) (*link.Link, *managerStatus, error) {
 	for c.managerPool.Len() > 0 {
 		status := heap.Pop(c.managerPool).(*managerStatus)
 
-		/*select {
-		case <-status.closed:
-			continue
-		default:
-		}*/
 		if atomic.CompareAndSwapInt32(&status.closed, 1, 1) {
 			continue
 		}
@@ -303,11 +290,6 @@ func (c *Client) realNewLink(count int) (*link.Link, *managerStatus, error) {
 			c.poolLock.Lock()
 			go status.manager.Close()
 
-			/*select {
-			case <-status.closed:
-			default:
-				close(status.closed)
-			}*/
 			atomic.StoreInt32(&status.closed, 1)
 
 			heap.Remove(c.managerPool, status.index)
@@ -334,7 +316,6 @@ func (c *Client) realNewLink(count int) (*link.Link, *managerStatus, error) {
 	l, err := status.manager.NewLink()
 	if err != nil {
 		go status.manager.Close()
-		// close(status.closed)
 		atomic.StoreInt32(&status.closed, 1)
 		return c.realNewLink(count + 1)
 	}
