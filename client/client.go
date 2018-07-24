@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Sherlock-Holo/camouflage/ca"
@@ -115,9 +116,13 @@ func (c *Client) handle(conn net.Conn) {
 		l.Close()
 
 		c.poolLock.Lock()
-		select {
+		/*select {
 		case <-status.closed:
 		default:
+			status.count--
+			heap.Fix(c.managerPool, status.index)
+		}*/
+		if atomic.CompareAndSwapInt32(&status.closed, 0, 0) {
 			status.count--
 			heap.Fix(c.managerPool, status.index)
 		}
@@ -135,9 +140,13 @@ func (c *Client) handle(conn net.Conn) {
 		l.Close()
 
 		c.poolLock.Lock()
-		select {
+		/*select {
 		case <-status.closed:
 		default:
+			status.count--
+			heap.Fix(c.managerPool, status.index)
+		}*/
+		if atomic.CompareAndSwapInt32(&status.closed, 0, 0) {
 			status.count--
 			heap.Fix(c.managerPool, status.index)
 		}
@@ -197,9 +206,13 @@ func (c *Client) handle(conn net.Conn) {
 	l.Close()
 
 	c.poolLock.Lock()
-	select {
+	/*select {
 	case <-status.closed:
 	default:
+		status.count--
+		heap.Fix(c.managerPool, status.index)
+	}*/
+	if atomic.CompareAndSwapInt32(&status.closed, 0, 0) {
 		status.count--
 		heap.Fix(c.managerPool, status.index)
 	}
@@ -267,10 +280,13 @@ func (c *Client) realNewLink(count int) (*link.Link, *managerStatus, error) {
 	for c.managerPool.Len() > 0 {
 		status := heap.Pop(c.managerPool).(*managerStatus)
 
-		select {
+		/*select {
 		case <-status.closed:
 			continue
 		default:
+		}*/
+		if atomic.CompareAndSwapInt32(&status.closed, 1, 1) {
+			continue
 		}
 
 		if status.count >= int32(c.maxLinks) {
@@ -287,11 +303,12 @@ func (c *Client) realNewLink(count int) (*link.Link, *managerStatus, error) {
 			c.poolLock.Lock()
 			go status.manager.Close()
 
-			select {
+			/*select {
 			case <-status.closed:
 			default:
 				close(status.closed)
-			}
+			}*/
+			atomic.StoreInt32(&status.closed, 1)
 
 			heap.Remove(c.managerPool, status.index)
 
@@ -312,13 +329,13 @@ func (c *Client) realNewLink(count int) (*link.Link, *managerStatus, error) {
 	status := &managerStatus{
 		manager: link.NewManager(websocket2.NewWrapper(conn), link.KeepaliveConfig),
 		count:   1,
-		closed:  make(chan struct{}),
 	}
 
 	l, err := status.manager.NewLink()
 	if err != nil {
 		go status.manager.Close()
-		close(status.closed)
+		// close(status.closed)
+		atomic.StoreInt32(&status.closed, 1)
 		return c.realNewLink(count + 1)
 	}
 
