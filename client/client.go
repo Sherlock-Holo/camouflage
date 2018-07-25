@@ -11,8 +11,6 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
-	"sync/atomic"
-	"time"
 
 	"github.com/Sherlock-Holo/camouflage/ca"
 	"github.com/Sherlock-Holo/camouflage/config"
@@ -25,17 +23,16 @@ import (
 type Client struct {
 	listener net.Listener
 
-	wsURL string
+	wsURL    string
+	wsDialer websocket.Dialer
 
-	managerPool *managerHeap
-	poolLock    sync.Mutex
+	pool     *baseHeap
+	poolLock sync.Mutex
 
 	maxLinks int
-
-	dialer websocket.Dialer
 }
 
-func NewClient(cfg config.Client) (*Client, error) {
+func New(cfg config.Client) (*Client, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.SocksAddr, cfg.SocksPort))
 	if err != nil {
 		return nil, err
@@ -67,19 +64,16 @@ func NewClient(cfg config.Client) (*Client, error) {
 	return &Client{
 		listener: listener,
 
-		wsURL: wsURL,
+		wsURL:    wsURL,
+		wsDialer: dialer,
 
-		managerPool: new(managerHeap),
+		pool: new(baseHeap),
 
 		maxLinks: cfg.MaxLinks,
-
-		dialer: dialer,
 	}, nil
 }
 
 func (c *Client) Run() {
-	go c.clean()
-
 	for {
 		conn, err := c.listener.Accept()
 		if err != nil {
@@ -89,6 +83,68 @@ func (c *Client) Run() {
 
 		go c.handle(conn)
 	}
+}
+
+func (c *Client) newLink() (*link.Link, *base, error) {
+	return c.realNewLink(0)
+}
+
+func (c *Client) realNewLink(count int) (*link.Link, *base, error) {
+	if count > 10 {
+		return nil, nil, errors.New("new Link failed")
+	}
+
+	c.poolLock.Lock()
+	for c.pool.Len() > 0 {
+		base := heap.Pop(c.pool).(*base)
+
+		// base is closed
+		if base.manager.IsClosed() {
+			continue
+		}
+
+		if base.count >= int32(c.maxLinks) {
+			heap.Push(c.pool, base)
+			break
+		}
+
+		l, err := base.manager.NewLink()
+		if err != nil {
+			go base.manager.Close()
+			c.poolLock.Unlock()
+
+			return c.realNewLink(count + 1)
+		}
+
+		base.count++
+		heap.Push(c.pool, base)
+		c.poolLock.Unlock()
+
+		return l, base, nil
+	}
+	c.poolLock.Unlock()
+
+	conn, _, err := c.wsDialer.Dial(c.wsURL, nil)
+	if err != nil {
+		return c.realNewLink(count + 1)
+	}
+
+	base := &base{
+		manager: link.NewManager(websocket2.NewWrapper(conn), link.KeepaliveConfig),
+		count:   1,
+	}
+
+	l, err := base.manager.NewLink()
+	if err != nil {
+		go base.manager.Close()
+		return c.realNewLink(count + 1)
+	}
+
+	c.poolLock.Lock()
+	heap.Push(c.pool, base)
+	c.poolLock.Unlock()
+
+	return l, base, nil
 }
 
 func (c *Client) handle(conn net.Conn) {
@@ -101,7 +157,7 @@ func (c *Client) handle(conn net.Conn) {
 
 	socksLocalAddr := socks.LocalAddr().(*net.TCPAddr)
 
-	l, status, err := c.newLink()
+	l, base, err := c.newLink()
 	if err != nil {
 		log.Println(err)
 		socks.Reply(socksLocalAddr.IP, uint16(socksLocalAddr.Port), libsocks.ServerFailed)
@@ -115,15 +171,30 @@ func (c *Client) handle(conn net.Conn) {
 		socks.Close()
 		l.Close()
 
-		if atomic.CompareAndSwapInt32(&status.closed, 0, 0) {
-			c.poolLock.Lock()
+		c.poolLock.Lock()
+		if base.index != -1 {
+			// base is closed
+			if base.manager.IsClosed() {
+				heap.Remove(c.pool, base.index)
 
-			status.count--
-			heap.Fix(c.managerPool, status.index)
+			} else {
+				base.count--
 
-			c.poolLock.Unlock()
+				// check it should remove base or not
+				if base.count == 0 {
+					if c.pool.Len() > 2 {
+						go base.manager.Close()
+						heap.Remove(c.pool, base.index)
+					} else {
+						heap.Fix(c.pool, base.index)
+					}
+
+				} else {
+					heap.Fix(c.pool, base.index)
+				}
+			}
 		}
-
+		c.poolLock.Unlock()
 		return
 	}
 
@@ -135,15 +206,30 @@ func (c *Client) handle(conn net.Conn) {
 		socks.Close()
 		l.Close()
 
-		if atomic.CompareAndSwapInt32(&status.closed, 0, 0) {
-			c.poolLock.Lock()
+		c.poolLock.Lock()
+		if base.index != -1 {
+			// base is closed
+			if base.manager.IsClosed() {
+				heap.Remove(c.pool, base.index)
 
-			status.count--
-			heap.Fix(c.managerPool, status.index)
+			} else {
+				base.count--
 
-			c.poolLock.Unlock()
+				// check it should remove base or not
+				if base.count == 0 {
+					if c.pool.Len() > 2 {
+						go base.manager.Close()
+						heap.Remove(c.pool, base.index)
+					} else {
+						heap.Fix(c.pool, base.index)
+					}
+
+				} else {
+					heap.Fix(c.pool, base.index)
+				}
+			}
 		}
-
+		c.poolLock.Unlock()
 		return
 	}
 
@@ -202,127 +288,29 @@ func (c *Client) handle(conn net.Conn) {
 	socks.Close()
 	l.Close()
 
-	if atomic.CompareAndSwapInt32(&status.closed, 0, 0) {
-		c.poolLock.Lock()
+	c.poolLock.Lock()
+	if base.index != -1 {
+		// base is closed
+		if base.manager.IsClosed() {
+			heap.Remove(c.pool, base.index)
 
-		status.count--
-		heap.Fix(c.managerPool, status.index)
+		} else {
+			base.count--
 
-		c.poolLock.Unlock()
-	}
-}
+			// check it should remove base or not
+			if base.count == 0 {
+				if c.pool.Len() > 2 {
+					go base.manager.Close()
+					heap.Remove(c.pool, base.index)
+				} else {
+					heap.Fix(c.pool, base.index)
+				}
 
-func (c *Client) clean() {
-	ticker := time.NewTicker(15 * time.Second)
-
-	for {
-		<-ticker.C
-
-		var tmp []*managerStatus
-
-		c.poolLock.Lock()
-		var cleaned int
-
-		for {
-			if c.managerPool.Len() <= 1 {
-				break
-			}
-
-			status := heap.Pop(c.managerPool).(*managerStatus)
-
-			switch {
-			case status.count == 0:
-				cleaned++
-				go status.manager.Close()
-
-			case status.manager.IsClosed():
-				cleaned++
-				go status.manager.Close()
-
-			default:
-				tmp = append(tmp, status)
+			} else {
+				heap.Fix(c.pool, base.index)
 			}
 		}
-
-		if tmp != nil {
-			pool := managerHeap(tmp)
-			c.managerPool = &pool
-
-			heap.Init(c.managerPool)
-		}
-
-		c.poolLock.Unlock()
-
-		if cleaned > 0 {
-			log.Printf("clean %d useless manager(s)", cleaned)
-		}
-	}
-}
-
-func (c *Client) newLink() (*link.Link, *managerStatus, error) {
-	return c.realNewLink(1)
-}
-
-func (c *Client) realNewLink(count int) (*link.Link, *managerStatus, error) {
-	if count >= 10 {
-		return nil, nil, errors.New("new Link failed")
-	}
-
-	c.poolLock.Lock()
-	for c.managerPool.Len() > 0 {
-		status := heap.Pop(c.managerPool).(*managerStatus)
-
-		if atomic.CompareAndSwapInt32(&status.closed, 1, 1) {
-			continue
-		}
-
-		if status.count >= int32(c.maxLinks) {
-			heap.Push(c.managerPool, status)
-			break
-		}
-
-		status.count++
-		heap.Push(c.managerPool, status)
-		c.poolLock.Unlock()
-
-		l, err := status.manager.NewLink()
-		if err != nil {
-			c.poolLock.Lock()
-			go status.manager.Close()
-
-			atomic.StoreInt32(&status.closed, 1)
-
-			heap.Remove(c.managerPool, status.index)
-
-			c.poolLock.Unlock()
-
-			return c.realNewLink(count + 1)
-		}
-
-		return l, status, nil
 	}
 	c.poolLock.Unlock()
-
-	conn, _, err := c.dialer.Dial(c.wsURL, nil)
-	if err != nil {
-		return c.realNewLink(count + 1)
-	}
-
-	status := &managerStatus{
-		manager: link.NewManager(websocket2.NewWrapper(conn), link.KeepaliveConfig),
-		count:   1,
-	}
-
-	l, err := status.manager.NewLink()
-	if err != nil {
-		go status.manager.Close()
-		atomic.StoreInt32(&status.closed, 1)
-		return c.realNewLink(count + 1)
-	}
-
-	c.poolLock.Lock()
-	heap.Push(c.managerPool, status)
-	c.poolLock.Unlock()
-
-	return l, status, nil
+	return
 }
