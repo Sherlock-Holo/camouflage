@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
+	"sync/atomic"
 
 	"github.com/Sherlock-Holo/camouflage/ca"
 	"github.com/Sherlock-Holo/camouflage/config"
@@ -32,6 +33,8 @@ type Client struct {
 	poolLock sync.Mutex
 
 	maxLinks int
+
+	monitor *Monitor
 }
 
 func New(cfg config.Client) (*Client, error) {
@@ -63,6 +66,13 @@ func New(cfg config.Client) (*Client, error) {
 		},
 	}
 
+	var monitor *Monitor
+
+	if cfg.MonitorPort != 0 && cfg.MonitorAddr != "" {
+		monitor = new(Monitor)
+		go monitor.start(cfg.MonitorAddr, cfg.MonitorPort)
+	}
+
 	return &Client{
 		listener: listener,
 
@@ -72,6 +82,8 @@ func New(cfg config.Client) (*Client, error) {
 		pool: new(baseHeap),
 
 		maxLinks: cfg.MaxLinks,
+
+		monitor: monitor,
 	}, nil
 }
 
@@ -102,6 +114,10 @@ func (c *Client) realNewLink(count int) (*link.Link, *base, error) {
 
 		// base is closed
 		if base.manager.IsClosed() {
+			// report to monitor
+			if c.monitor != nil {
+				atomic.AddInt32(&c.monitor.baseConnections, -1)
+			}
 			continue
 		}
 
@@ -114,6 +130,11 @@ func (c *Client) realNewLink(count int) (*link.Link, *base, error) {
 		if err != nil {
 			go base.manager.Close()
 			c.poolLock.Unlock()
+
+			// report to monitor
+			if c.monitor != nil {
+				atomic.AddInt32(&c.monitor.baseConnections, -1)
+			}
 
 			return c.realNewLink(count + 1)
 		}
@@ -145,6 +166,11 @@ func (c *Client) realNewLink(count int) (*link.Link, *base, error) {
 	c.poolLock.Lock()
 	heap.Push(c.pool, base)
 	c.poolLock.Unlock()
+
+	// report to monitor
+	if c.monitor != nil {
+		atomic.AddInt32(&c.monitor.baseConnections, 1)
+	}
 
 	return l, base, nil
 }
@@ -179,6 +205,11 @@ func (c *Client) handle(conn net.Conn) {
 			if base.manager.IsClosed() {
 				heap.Remove(c.pool, base.index)
 
+				// report to monitor
+				if c.monitor != nil {
+					atomic.AddInt32(&c.monitor.baseConnections, -1)
+				}
+
 			} else {
 				base.count--
 
@@ -187,6 +218,12 @@ func (c *Client) handle(conn net.Conn) {
 					if c.pool.Len() > poolCachedSize {
 						go base.manager.Close()
 						heap.Remove(c.pool, base.index)
+
+						// report to monitor
+						if c.monitor != nil {
+							atomic.AddInt32(&c.monitor.baseConnections, -1)
+						}
+
 					} else {
 						heap.Fix(c.pool, base.index)
 					}
@@ -214,6 +251,11 @@ func (c *Client) handle(conn net.Conn) {
 			if base.manager.IsClosed() {
 				heap.Remove(c.pool, base.index)
 
+				// report to monitor
+				if c.monitor != nil {
+					atomic.AddInt32(&c.monitor.baseConnections, -1)
+				}
+
 			} else {
 				base.count--
 
@@ -222,6 +264,12 @@ func (c *Client) handle(conn net.Conn) {
 					if c.pool.Len() > poolCachedSize {
 						go base.manager.Close()
 						heap.Remove(c.pool, base.index)
+
+						// report to monitor
+						if c.monitor != nil {
+							atomic.AddInt32(&c.monitor.baseConnections, -1)
+						}
+
 					} else {
 						heap.Fix(c.pool, base.index)
 					}
@@ -240,6 +288,11 @@ func (c *Client) handle(conn net.Conn) {
 		die        = make(chan struct{})
 		once       = sync.Once{}
 	)
+
+	// report to monitor
+	if c.monitor != nil {
+		atomic.AddInt32(&c.monitor.tcpConnections, 1)
+	}
 
 	go func() {
 		if _, err := io.Copy(l, socks); err != nil {
@@ -290,11 +343,21 @@ func (c *Client) handle(conn net.Conn) {
 	socks.Close()
 	l.Close()
 
+	// report to monitor
+	if c.monitor != nil {
+		atomic.AddInt32(&c.monitor.tcpConnections, -1)
+	}
+
 	c.poolLock.Lock()
 	if base.index != -1 {
 		// base is closed
 		if base.manager.IsClosed() {
 			heap.Remove(c.pool, base.index)
+
+			// report to monitor
+			if c.monitor != nil {
+				atomic.AddInt32(&c.monitor.baseConnections, -1)
+			}
 
 		} else {
 			base.count--
@@ -304,6 +367,12 @@ func (c *Client) handle(conn net.Conn) {
 				if c.pool.Len() > poolCachedSize {
 					go base.manager.Close()
 					heap.Remove(c.pool, base.index)
+
+					// report to monitor
+					if c.monitor != nil {
+						atomic.AddInt32(&c.monitor.baseConnections, -1)
+					}
+
 				} else {
 					heap.Fix(c.pool, base.index)
 				}

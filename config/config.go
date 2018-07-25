@@ -25,6 +25,9 @@ type Client struct {
 	KeyFile string
 
 	MaxLinks int
+
+	MonitorAddr string
+	MonitorPort int
 }
 
 type Server struct {
@@ -129,6 +132,15 @@ func ReadClient(cfgFile string) (Client, error) {
 			client.MaxLinks = 100
 		} else {
 			client.MaxLinks = maxLinks
+		}
+	}
+
+	if monitorAddr, ok := section["monitor_addr"]; ok {
+		if monitorPortString, ok := section["monitor_port"]; ok {
+			if monitorPort, err := strconv.Atoi(monitorPortString); err == nil {
+				client.MonitorAddr = monitorAddr
+				client.MonitorPort = monitorPort
+			}
 		}
 	}
 
