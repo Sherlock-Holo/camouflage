@@ -32,7 +32,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		c, err := client.NewClient(cfg)
+		c, err := client.New(cfg)
 		if err != nil {
 			log.Fatal(err)
 		}
