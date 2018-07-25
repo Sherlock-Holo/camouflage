@@ -20,6 +20,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const poolCachedSize = 1
+
 type Client struct {
 	listener net.Listener
 
@@ -182,7 +184,7 @@ func (c *Client) handle(conn net.Conn) {
 
 				// check it should remove base or not
 				if base.count == 0 {
-					if c.pool.Len() > 2 {
+					if c.pool.Len() > poolCachedSize {
 						go base.manager.Close()
 						heap.Remove(c.pool, base.index)
 					} else {
@@ -217,7 +219,7 @@ func (c *Client) handle(conn net.Conn) {
 
 				// check it should remove base or not
 				if base.count == 0 {
-					if c.pool.Len() > 2 {
+					if c.pool.Len() > poolCachedSize {
 						go base.manager.Close()
 						heap.Remove(c.pool, base.index)
 					} else {
@@ -299,7 +301,7 @@ func (c *Client) handle(conn net.Conn) {
 
 			// check it should remove base or not
 			if base.count == 0 {
-				if c.pool.Len() > 2 {
+				if c.pool.Len() > poolCachedSize {
 					go base.manager.Close()
 					heap.Remove(c.pool, base.index)
 				} else {
