@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"strconv"
@@ -22,5 +23,5 @@ func (m *Monitor) report(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Monitor) start(addr string, port int) {
-	http.ListenAndServe(net.JoinHostPort(addr, strconv.Itoa(port)), http.HandlerFunc(m.report))
+	log.Fatal(http.ListenAndServe(net.JoinHostPort(addr, strconv.Itoa(port)), http.HandlerFunc(m.report)))
 }
