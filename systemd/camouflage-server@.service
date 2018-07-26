@@ -5,6 +5,8 @@ After=network.target
 [Service]
 ExecStart=/usr/bin/camouflage -server /etc/camouflage/%i.conf
 MemoryAccounting=true
+Restart=on-failure
+RestartSec=30
 
 [Install]
 WantedBy=multi-user.target
