@@ -296,27 +296,29 @@ func (c *Client) errorHandle(socks, link io.ReadWriteCloser, base *base) {
 				atomic.AddInt32(&c.monitor.baseConnections, -1)
 			}
 
-		} else {
-			base.count--
+			c.poolLock.Unlock()
+			return
+		}
 
-			// check it should remove base or not
-			if base.count == 0 {
-				if c.pool.Len() > poolCachedSize {
-					go base.manager.Close()
-					heap.Remove(c.pool, base.index)
+		base.count--
 
-					// report to monitor
-					if c.monitor != nil {
-						atomic.AddInt32(&c.monitor.baseConnections, -1)
-					}
+		// check it should remove base or not
+		if base.count == 0 {
+			if c.pool.Len() > poolCachedSize {
+				go base.manager.Close()
+				heap.Remove(c.pool, base.index)
 
-				} else {
-					heap.Fix(c.pool, base.index)
+				// report to monitor
+				if c.monitor != nil {
+					atomic.AddInt32(&c.monitor.baseConnections, -1)
 				}
 
 			} else {
 				heap.Fix(c.pool, base.index)
 			}
+
+		} else {
+			heap.Fix(c.pool, base.index)
 		}
 	}
 	c.poolLock.Unlock()
