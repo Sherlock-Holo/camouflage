@@ -21,7 +21,7 @@ import (
 
 type Server struct {
 	server http.Server
-	config config.Server
+	config config.Server1
 }
 
 type handler struct {
@@ -137,7 +137,7 @@ func (s *Server) Run() {
 	log.Println(s.server.ListenAndServeTLS(s.config.CrtFile, s.config.KeyFile))
 }
 
-func NewServer(cfg config.Server) (*Server, error) {
+func NewServer(cfg config.Server1) (*Server, error) {
 	pool := x509.NewCertPool()
 	pool.AppendCertsFromPEM(cfg.CA)
 

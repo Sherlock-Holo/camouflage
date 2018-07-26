@@ -37,7 +37,7 @@ type Client struct {
 	monitor *Monitor
 }
 
-func New(cfg config.Client) (*Client, error) {
+func New(cfg config.Client1) (*Client, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.SocksAddr, cfg.SocksPort))
 	if err != nil {
 		return nil, err
@@ -176,7 +176,7 @@ func (c *Client) realNewLink(count int) (*link.Link, *base, error) {
 }
 
 func (c *Client) handle(conn net.Conn) {
-	socks, err := frontend.Frontends[frontend.SOCKS](conn)
+	socks, err := frontend.Frontends[frontend.SOCKS](conn, nil)
 	if err != nil {
 		log.Println(err)
 		conn.Close()

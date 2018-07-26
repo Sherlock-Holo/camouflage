@@ -22,6 +22,7 @@ type Frontend interface {
 	CloseRead() error
 }
 
-var Frontends = map[int]func(conn net.Conn) (Frontend, error){
+var Frontends = map[int]func(conn net.Conn, key []byte) (Frontend, error){
 	SOCKS: NewSocks,
+	SHADOWSOCKS_CHACHA20_IETF: NewShadowsocks,
 }

@@ -8,10 +8,11 @@ import (
 )
 
 type Socks struct {
-	socks libsocks.Socks
+	socks  libsocks.Socks
+	target []byte
 }
 
-func NewSocks(conn net.Conn) (socks Frontend, err error) {
+func NewSocks(conn net.Conn, _ []byte) (socks Frontend, err error) {
 	s, err := libsocks.NewSocks(conn, nil)
 	if err != nil {
 		err = fmt.Errorf("new socks: %s", err)
@@ -19,7 +20,9 @@ func NewSocks(conn net.Conn) (socks Frontend, err error) {
 		return
 	}
 
-	return &Socks{s}, nil
+	return &Socks{
+		socks: s,
+	}, nil
 }
 
 func (s *Socks) Handshake(b bool) error {
@@ -31,6 +34,9 @@ func (s *Socks) Handshake(b bool) error {
 }
 
 func (s *Socks) Target() []byte {
+	if s.target == nil {
+
+	}
 	return s.socks.Target.Bytes()
 }
 

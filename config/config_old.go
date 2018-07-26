@@ -10,7 +10,7 @@ import (
 	"github.com/Unknwon/goconfig"
 )
 
-type Client struct {
+type Client1 struct {
 	SocksAddr string
 	SocksPort int
 
@@ -30,7 +30,7 @@ type Client struct {
 	MonitorPort int
 }
 
-type Server struct {
+type Server1 struct {
 	BindAddr string
 	BindPort int
 
@@ -45,53 +45,53 @@ type Server struct {
 	DNS string
 }
 
-func ReadClient(cfgFile string) (Client, error) {
+func ReadClient(cfgFile string) (Client1, error) {
 	cfg, err := goconfig.LoadConfigFile(cfgFile)
 	if err != nil {
-		return Client{}, err
+		return Client1{}, err
 	}
 
 	section, err := cfg.GetSection("client")
 	if err != nil {
-		return Client{}, err
+		return Client1{}, err
 	}
 
-	client := Client{}
+	client := Client1{}
 
 	if remoteAddr, ok := section["remote_addr"]; ok {
 		client.RemoteAddr = remoteAddr
 	} else {
-		return Client{}, errors.New("need remote_addr")
+		return Client1{}, errors.New("need remote_addr")
 	}
 
 	if remotePort, ok := section["remote_port"]; ok {
 		client.RemotePort, err = strconv.Atoi(remotePort)
 		if err != nil {
-			return Client{}, err
+			return Client1{}, err
 		}
 	} else {
-		return Client{}, errors.New("need remote_port")
+		return Client1{}, errors.New("need remote_port")
 	}
 
 	if path, ok := section["path"]; ok {
 		client.Path = path
 	} else {
-		return Client{}, errors.New("need path")
+		return Client1{}, errors.New("need path")
 	}
 
 	if socksAddr, ok := section["socks_addr"]; ok {
 		client.SocksAddr = socksAddr
 	} else {
-		return Client{}, errors.New("need socks_addr")
+		return Client1{}, errors.New("need socks_addr")
 	}
 
 	if socksPort, ok := section["socks_port"]; ok {
 		client.SocksPort, err = strconv.Atoi(socksPort)
 		if err != nil {
-			return Client{}, err
+			return Client1{}, err
 		}
 	} else {
-		return Client{}, errors.New("need socks_port")
+		return Client1{}, errors.New("need socks_port")
 	}
 
 	if caFile, ok := section["ca_crt"]; ok {
@@ -101,12 +101,12 @@ func ReadClient(cfgFile string) (Client, error) {
 
 		ca, err := ioutil.ReadFile(caFile)
 		if err != nil {
-			return Client{}, err
+			return Client1{}, err
 		}
 
 		client.CA = ca
 	} else {
-		return Client{}, errors.New("need ca_crt")
+		return Client1{}, errors.New("need ca_crt")
 	}
 
 	if crtFile, ok := section["crt"]; ok {
@@ -115,7 +115,7 @@ func ReadClient(cfgFile string) (Client, error) {
 		}
 		client.CrtFile = crtFile
 	} else {
-		return Client{}, errors.New("need crt")
+		return Client1{}, errors.New("need crt")
 	}
 
 	if keyFile, ok := section["key"]; ok {
@@ -124,7 +124,7 @@ func ReadClient(cfgFile string) (Client, error) {
 		}
 		client.KeyFile = keyFile
 	} else {
-		return Client{}, errors.New("need key")
+		return Client1{}, errors.New("need key")
 	}
 
 	if maxLinksString, ok := section["max_links"]; ok {
@@ -147,38 +147,38 @@ func ReadClient(cfgFile string) (Client, error) {
 	return client, nil
 }
 
-func ReadServer(cfgFile string) (Server, error) {
+func ReadServer(cfgFile string) (Server1, error) {
 	cfg, err := goconfig.LoadConfigFile(cfgFile)
 	if err != nil {
-		return Server{}, err
+		return Server1{}, err
 	}
 
 	section, err := cfg.GetSection("server")
 	if err != nil {
-		return Server{}, err
+		return Server1{}, err
 	}
 
-	server := Server{}
+	server := Server1{}
 
 	if bindAddr, ok := section["bind_addr"]; ok {
 		server.BindAddr = bindAddr
 	} else {
-		return Server{}, errors.New("need bind_addr")
+		return Server1{}, errors.New("need bind_addr")
 	}
 
 	if bindPort, ok := section["bind_port"]; ok {
 		server.BindPort, err = strconv.Atoi(bindPort)
 		if err != nil {
-			return Server{}, err
+			return Server1{}, err
 		}
 	} else {
-		return Server{}, errors.New("need bind_port")
+		return Server1{}, errors.New("need bind_port")
 	}
 
 	if path, ok := section["path"]; ok {
 		server.Path = path
 	} else {
-		return Server{}, errors.New("need path")
+		return Server1{}, errors.New("need path")
 	}
 
 	if caFile, ok := section["ca_crt"]; ok {
@@ -187,12 +187,12 @@ func ReadServer(cfgFile string) (Server, error) {
 		}
 		ca, err := ioutil.ReadFile(caFile)
 		if err != nil {
-			return Server{}, err
+			return Server1{}, err
 		}
 
 		server.CA = ca
 	} else {
-		return Server{}, errors.New("need ca_crt")
+		return Server1{}, errors.New("need ca_crt")
 	}
 
 	if crtFile, ok := section["crt"]; ok {
@@ -201,7 +201,7 @@ func ReadServer(cfgFile string) (Server, error) {
 		}
 		server.CrtFile = crtFile
 	} else {
-		return Server{}, errors.New("need crt")
+		return Server1{}, errors.New("need crt")
 	}
 
 	if keyFile, ok := section["key"]; ok {
@@ -210,7 +210,7 @@ func ReadServer(cfgFile string) (Server, error) {
 		}
 		server.KeyFile = keyFile
 	} else {
-		return Server{}, errors.New("need key")
+		return Server1{}, errors.New("need key")
 	}
 
 	if dnsString, ok := section["dns"]; ok {
