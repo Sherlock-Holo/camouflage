@@ -199,41 +199,7 @@ func (c *Client) handle(conn net.Conn) {
 		socks.Close()
 		l.Close()
 
-		c.poolLock.Lock()
-		if base.index != -1 {
-			// base is closed
-			if base.manager.IsClosed() {
-				heap.Remove(c.pool, base.index)
-
-				// report to monitor
-				if c.monitor != nil {
-					atomic.AddInt32(&c.monitor.baseConnections, -1)
-				}
-
-			} else {
-				base.count--
-
-				// check it should remove base or not
-				if base.count == 0 {
-					if c.pool.Len() > poolCachedSize {
-						go base.manager.Close()
-						heap.Remove(c.pool, base.index)
-
-						// report to monitor
-						if c.monitor != nil {
-							atomic.AddInt32(&c.monitor.baseConnections, -1)
-						}
-
-					} else {
-						heap.Fix(c.pool, base.index)
-					}
-
-				} else {
-					heap.Fix(c.pool, base.index)
-				}
-			}
-		}
-		c.poolLock.Unlock()
+		c.errorHandle(socks, l, base)
 		return
 	}
 
@@ -245,41 +211,7 @@ func (c *Client) handle(conn net.Conn) {
 		socks.Close()
 		l.Close()
 
-		c.poolLock.Lock()
-		if base.index != -1 {
-			// base is closed
-			if base.manager.IsClosed() {
-				heap.Remove(c.pool, base.index)
-
-				// report to monitor
-				if c.monitor != nil {
-					atomic.AddInt32(&c.monitor.baseConnections, -1)
-				}
-
-			} else {
-				base.count--
-
-				// check it should remove base or not
-				if base.count == 0 {
-					if c.pool.Len() > poolCachedSize {
-						go base.manager.Close()
-						heap.Remove(c.pool, base.index)
-
-						// report to monitor
-						if c.monitor != nil {
-							atomic.AddInt32(&c.monitor.baseConnections, -1)
-						}
-
-					} else {
-						heap.Fix(c.pool, base.index)
-					}
-
-				} else {
-					heap.Fix(c.pool, base.index)
-				}
-			}
-		}
-		c.poolLock.Unlock()
+		c.errorHandle(socks, l, base)
 		return
 	}
 
@@ -348,6 +280,11 @@ func (c *Client) handle(conn net.Conn) {
 		atomic.AddInt32(&c.monitor.tcpConnections, -1)
 	}
 
+	c.errorHandle(socks, l, base)
+	return
+}
+
+func (c *Client) errorHandle(socks, link io.ReadWriteCloser, base *base) {
 	c.poolLock.Lock()
 	if base.index != -1 {
 		// base is closed
@@ -383,5 +320,4 @@ func (c *Client) handle(conn net.Conn) {
 		}
 	}
 	c.poolLock.Unlock()
-	return
 }
