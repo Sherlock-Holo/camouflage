@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/Sherlock-Holo/libsocks"
@@ -8,6 +9,17 @@ import (
 
 type Socks struct {
 	socks libsocks.Socks
+}
+
+func NewSocks(conn net.Conn) (socks Frontend, err error) {
+	s, err := libsocks.NewSocks(conn, nil)
+	if err != nil {
+		err = fmt.Errorf("new socks: %s", err)
+		conn.Close()
+		return
+	}
+
+	return &Socks{s}, nil
 }
 
 func (s *Socks) Handshake(b bool) error {
@@ -18,8 +30,8 @@ func (s *Socks) Handshake(b bool) error {
 	}
 }
 
-func (s *Socks) Target() string {
-	return s.socks.Target.String()
+func (s *Socks) Target() []byte {
+	return s.socks.Target.Bytes()
 }
 
 func (s *Socks) Read(p []byte) (n int, err error) {
@@ -36,4 +48,8 @@ func (s *Socks) Close() error {
 
 func (s *Socks) CloseWrite() error {
 	return s.socks.CloseWrite()
+}
+
+func (s *Socks) CloseRead() error {
+	return s.socks.CloseRead()
 }

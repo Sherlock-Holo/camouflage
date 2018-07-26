@@ -23,5 +23,5 @@ func (m *Monitor) report(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Monitor) start(addr string, port int) {
-	log.Fatal(http.ListenAndServe(net.JoinHostPort(addr, strconv.Itoa(port)), http.HandlerFunc(m.report)))
+	log.Println("monitor init:", http.ListenAndServe(net.JoinHostPort(addr, strconv.Itoa(port)), http.HandlerFunc(m.report)))
 }

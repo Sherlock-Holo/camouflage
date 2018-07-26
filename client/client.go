@@ -15,8 +15,8 @@ import (
 
 	"github.com/Sherlock-Holo/camouflage/ca"
 	"github.com/Sherlock-Holo/camouflage/config"
+	"github.com/Sherlock-Holo/camouflage/frontend"
 	websocket2 "github.com/Sherlock-Holo/goutils/websocket"
-	"github.com/Sherlock-Holo/libsocks"
 	"github.com/Sherlock-Holo/link"
 	"github.com/gorilla/websocket"
 )
@@ -176,26 +176,24 @@ func (c *Client) realNewLink(count int) (*link.Link, *base, error) {
 }
 
 func (c *Client) handle(conn net.Conn) {
-	socks, err := libsocks.NewSocks(conn, nil)
+	socks, err := frontend.Frontends[frontend.SOCKS](conn)
 	if err != nil {
-		log.Println("new socks:", err)
+		log.Println(err)
 		conn.Close()
 		return
 	}
 
-	socksLocalAddr := socks.LocalAddr().(*net.TCPAddr)
-
 	l, base, err := c.newLink()
 	if err != nil {
 		log.Println(err)
-		socks.Reply(socksLocalAddr.IP, uint16(socksLocalAddr.Port), libsocks.ServerFailed)
+		socks.Handshake(false)
 		socks.Close()
 		return
 	}
 
-	if _, err := l.Write(socks.Target.Bytes()); err != nil {
+	if _, err := l.Write(socks.Target()); err != nil {
 		log.Println("send target:", err)
-		socks.Reply(socksLocalAddr.IP, uint16(socksLocalAddr.Port), libsocks.ServerFailed)
+		socks.Handshake(false)
 		socks.Close()
 		l.Close()
 
@@ -203,11 +201,9 @@ func (c *Client) handle(conn net.Conn) {
 		return
 	}
 
-	localAddr := conn.LocalAddr().(*net.TCPAddr)
+	if socks.Handshake(true) != nil {
+		log.Println("handshake failed")
 
-	// socks reply
-	if err := socks.Reply(localAddr.IP, uint16(localAddr.Port), libsocks.Success); err != nil {
-		log.Println("socks reply", err)
 		socks.Close()
 		l.Close()
 
