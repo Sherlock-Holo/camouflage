@@ -16,7 +16,7 @@ monitor_port = 19998
     [client.ss]
     type = "ss"
     listen_addr = "127.0.0.1"
-    listen_port = 9876
+    listen_port = 9877
     key = "holo"
 
     [client.socks]

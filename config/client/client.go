@@ -1,6 +1,8 @@
 package client
 
 import (
+	"path/filepath"
+
 	"github.com/Sherlock-Holo/camouflage/frontend"
 	"github.com/pelletier/go-toml"
 )
@@ -34,6 +36,18 @@ func New(path string) (*Client, error) {
 	client := new(Client)
 	if err = clientTree.Unmarshal(client); err != nil {
 		return nil, err
+	}
+
+	if !filepath.IsAbs(client.CaCrt) {
+		client.CaCrt = filepath.Join(filepath.Dir(path), client.CaCrt)
+	}
+
+	if !filepath.IsAbs(client.Crt) {
+		client.Crt = filepath.Join(filepath.Dir(path), client.Crt)
+	}
+
+	if !filepath.IsAbs(client.Key) {
+		client.Key = filepath.Join(filepath.Dir(path), client.Key)
 	}
 
 	clientMap := clientTree.ToMap()

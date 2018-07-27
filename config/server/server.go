@@ -1,6 +1,8 @@
 package server
 
 import (
+	"path/filepath"
+
 	"github.com/pelletier/go-toml"
 )
 
@@ -28,6 +30,18 @@ func New(path string) (*Server, error) {
 	server := new(Server)
 	if err = serverTree.Unmarshal(server); err != nil {
 		return nil, err
+	}
+
+	if !filepath.IsAbs(server.CaCrt) {
+		server.CaCrt = filepath.Join(filepath.Dir(path), server.CaCrt)
+	}
+
+	if !filepath.IsAbs(server.Crt) {
+		server.Crt = filepath.Join(filepath.Dir(path), server.Crt)
+	}
+
+	if !filepath.IsAbs(server.Key) {
+		server.Key = filepath.Join(filepath.Dir(path), server.Key)
 	}
 
 	return server, nil
