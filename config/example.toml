@@ -23,8 +23,8 @@ key = "../script/client/client.key"
 
 
 [server]
-bind_addr = "127.0.0.1"
-bind_port = 9876
+listen_addr = "127.0.0.1"
+listen_port = 9876
 path = "/websocket"
 
 ca_crt = "../script/ca/ca.crt"
@@ -32,4 +32,5 @@ ca_crt = "../script/ca/ca.crt"
 crt = "../script/server/server.crt"
 key = "../script/server/server.key"
 
-dns = "udp#119.29.29.29:53"
+dns_type = "udp"
+dns = "119.29.29.29:53"
