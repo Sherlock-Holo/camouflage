@@ -7,7 +7,8 @@ import (
 	"os"
 
 	"github.com/Sherlock-Holo/camouflage/client"
-	"github.com/Sherlock-Holo/camouflage/config"
+	configClient "github.com/Sherlock-Holo/camouflage/config/client"
+	configServer "github.com/Sherlock-Holo/camouflage/config/server"
 	"github.com/Sherlock-Holo/camouflage/server"
 )
 
@@ -28,7 +29,7 @@ func main() {
 		os.Exit(2)
 
 	case *clientCfg != "":
-		cfg, err := config.ReadClient(*clientCfg)
+		cfg, err := configClient.New(*clientCfg)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -39,7 +40,7 @@ func main() {
 		c.Run()
 
 	case *serverCfg != "":
-		cfg, err := config.ReadServer(*serverCfg)
+		cfg, err := configServer.New(*serverCfg)
 		if err != nil {
 			log.Fatal(err)
 		}

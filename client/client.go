@@ -6,25 +6,28 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/url"
+	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
 
 	"github.com/Sherlock-Holo/camouflage/ca"
-	"github.com/Sherlock-Holo/camouflage/config"
+	"github.com/Sherlock-Holo/camouflage/config/client"
 	"github.com/Sherlock-Holo/camouflage/frontend"
 	websocket2 "github.com/Sherlock-Holo/goutils/websocket"
 	"github.com/Sherlock-Holo/link"
+	"github.com/Sherlock-Holo/streamencrypt"
 	"github.com/gorilla/websocket"
 )
 
 const poolCachedSize = 1
 
 type Client struct {
-	listener net.Listener
+	listeners map[frontend.Type][]ListenerInfo
 
 	wsURL    string
 	wsDialer websocket.Dialer
@@ -37,10 +40,34 @@ type Client struct {
 	monitor *Monitor
 }
 
-func New(cfg config.Client1) (*Client, error) {
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.SocksAddr, cfg.SocksPort))
-	if err != nil {
-		return nil, err
+func New(cfg *client.Client) (*Client, error) {
+	var (
+		shadowsocksListeners []ListenerInfo
+
+		socksListeners []ListenerInfo
+	)
+
+	cipherInfo := streamencrypt.Ciphers[streamencrypt.CHACHA20_IETF]
+
+	for _, ssCfg := range cfg.Shadowsocks {
+		listener, err := net.Listen("tcp", net.JoinHostPort(ssCfg.ListenAddr, strconv.Itoa(ssCfg.ListenPort)))
+		if err != nil {
+			return nil, err
+		}
+
+		shadowsocksListeners = append(shadowsocksListeners, ListenerInfo{
+			Key:      streamencrypt.EvpBytesToKey(ssCfg.Key, cipherInfo.KeyLen),
+			Listener: listener,
+		})
+	}
+
+	for _, socksCfg := range cfg.Socks {
+		listener, err := net.Listen("tcp", net.JoinHostPort(socksCfg.ListenAddr, strconv.Itoa(socksCfg.ListenPort)))
+		if err != nil {
+			return nil, err
+		}
+
+		socksListeners = append(socksListeners, ListenerInfo{Key: nil, Listener: listener})
 	}
 
 	wsURL := (&url.URL{
@@ -49,12 +76,23 @@ func New(cfg config.Client1) (*Client, error) {
 		Path:   cfg.Path,
 	}).String()
 
-	certificate, err := tls.LoadX509KeyPair(cfg.CrtFile, cfg.KeyFile)
+	certificate, err := tls.LoadX509KeyPair(cfg.Crt, cfg.Key)
 	if err != nil {
 		return nil, err
 	}
 
-	pool, err := ca.InitCAPool(cfg.CA)
+	caFile, err := os.Open(cfg.CaCrt)
+	if err != nil {
+		return nil, err
+	}
+	defer caFile.Close()
+
+	CA, err := ioutil.ReadAll(caFile)
+	if err != nil {
+		return nil, err
+	}
+
+	pool, err := ca.InitCAPool(CA)
 	if err != nil {
 		return nil, fmt.Errorf("Init CA Pool: %s\n", err)
 	}
@@ -73,8 +111,18 @@ func New(cfg config.Client1) (*Client, error) {
 		go monitor.start(cfg.MonitorAddr, cfg.MonitorPort)
 	}
 
+	listeners := make(map[frontend.Type][]ListenerInfo)
+
+	for _, ssListener := range shadowsocksListeners {
+		listeners[frontend.SHADOWSOCKS_CHACHA20_IETF] = append(listeners[frontend.SHADOWSOCKS_CHACHA20_IETF], ssListener)
+	}
+
+	for _, socksListener := range socksListeners {
+		listeners[frontend.SOCKS] = append(listeners[frontend.SOCKS], socksListener)
+	}
+
 	return &Client{
-		listener: listener,
+		listeners: listeners,
 
 		wsURL:    wsURL,
 		wsDialer: dialer,
@@ -88,15 +136,22 @@ func New(cfg config.Client1) (*Client, error) {
 }
 
 func (c *Client) Run() {
-	for {
-		conn, err := c.listener.Accept()
-		if err != nil {
-			log.Println(err)
-			continue
-		}
+	for frontendType := range c.listeners {
+		for _, listener := range c.listeners[frontendType] {
+			go func(frontendType frontend.Type, listener ListenerInfo) {
+				for {
+					conn, err := listener.Listener.Accept()
+					if err != nil {
+						log.Println(err)
+						continue
+					}
 
-		go c.handle(conn)
+					go c.handle(conn, frontendType, listener.Key)
+				}
+			}(frontendType, listener)
+		}
 	}
+	<-make(chan struct{})
 }
 
 func (c *Client) newLink() (*link.Link, *base, error) {
@@ -175,8 +230,8 @@ func (c *Client) realNewLink(count int) (*link.Link, *base, error) {
 	return l, base, nil
 }
 
-func (c *Client) handle(conn net.Conn) {
-	socks, err := frontend.Frontends[frontend.SOCKS](conn, nil)
+func (c *Client) handle(conn net.Conn, frontendType frontend.Type, key []byte) {
+	fe, err := frontend.Frontends[frontendType](conn, key)
 	if err != nil {
 		log.Println(err)
 		conn.Close()
@@ -186,28 +241,28 @@ func (c *Client) handle(conn net.Conn) {
 	l, base, err := c.newLink()
 	if err != nil {
 		log.Println(err)
-		socks.Handshake(false)
-		socks.Close()
+		fe.Handshake(false)
+		fe.Close()
 		return
 	}
 
-	if _, err := l.Write(socks.Target()); err != nil {
+	if _, err := l.Write(fe.Target()); err != nil {
 		log.Println("send target:", err)
-		socks.Handshake(false)
-		socks.Close()
+		fe.Handshake(false)
+		fe.Close()
 		l.Close()
 
-		c.errorHandle(socks, l, base)
+		c.errorHandle(fe, l, base)
 		return
 	}
 
-	if socks.Handshake(true) != nil {
+	if fe.Handshake(true) != nil {
 		log.Println("handshake failed")
 
-		socks.Close()
+		fe.Close()
 		l.Close()
 
-		c.errorHandle(socks, l, base)
+		c.errorHandle(fe, l, base)
 		return
 	}
 
@@ -223,7 +278,7 @@ func (c *Client) handle(conn net.Conn) {
 	}
 
 	go func() {
-		if _, err := io.Copy(l, socks); err != nil {
+		if _, err := io.Copy(l, fe); err != nil {
 			log.Println(err)
 
 			select {
@@ -237,12 +292,12 @@ func (c *Client) handle(conn net.Conn) {
 		}
 
 		l.CloseWrite()
-		socks.CloseRead()
+		fe.CloseRead()
 		closeCount <- struct{}{}
 	}()
 
 	go func() {
-		if _, err := io.Copy(socks, l); err != nil {
+		if _, err := io.Copy(fe, l); err != nil {
 			log.Println(err)
 
 			select {
@@ -255,7 +310,7 @@ func (c *Client) handle(conn net.Conn) {
 			return
 		}
 
-		socks.CloseWrite()
+		fe.CloseWrite()
 		closeCount <- struct{}{}
 	}()
 
@@ -268,7 +323,7 @@ func (c *Client) handle(conn net.Conn) {
 		}
 	}
 
-	socks.Close()
+	fe.Close()
 	l.Close()
 
 	// report to monitor
@@ -276,7 +331,7 @@ func (c *Client) handle(conn net.Conn) {
 		atomic.AddInt32(&c.monitor.tcpConnections, -1)
 	}
 
-	c.errorHandle(socks, l, base)
+	c.errorHandle(fe, l, base)
 	return
 }
 

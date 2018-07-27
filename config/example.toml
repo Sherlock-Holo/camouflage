@@ -10,6 +10,9 @@ ca_crt = "../script/ca/ca.crt"
 crt = "../script/client/client.crt"
 key = "../script/client/client.key"
 
+monitor_addr = "127.0.0.1"
+monitor_port = 19998
+
     [client.ss]
     type = "ss"
     listen_addr = "127.0.0.1"

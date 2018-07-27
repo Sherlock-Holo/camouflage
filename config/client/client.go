@@ -17,6 +17,9 @@ type Client struct {
 	Crt string `toml:"crt"`
 	Key string `toml:"key"`
 
+	MonitorAddr string `toml:"monitor_addr"`
+	MonitorPort int    `toml:"monitor_port"`
+
 	Shadowsocks []Shadowsocks `toml:"ignore"`
 	Socks       []Socks       `toml:"ignore"`
 }

@@ -4,14 +4,16 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
 	"net/http"
+	"os"
+	"strconv"
 
-	"github.com/Sherlock-Holo/camouflage/config"
+	"github.com/Sherlock-Holo/camouflage/config/server"
 	"github.com/Sherlock-Holo/camouflage/dns"
 	websocket2 "github.com/Sherlock-Holo/goutils/websocket"
 	"github.com/Sherlock-Holo/libsocks"
@@ -21,7 +23,7 @@ import (
 
 type Server struct {
 	server http.Server
-	config config.Server1
+	config server.Server
 }
 
 type handler struct {
@@ -134,18 +136,28 @@ func handle(handler *handler, l *link.Link) {
 }
 
 func (s *Server) Run() {
-	log.Println(s.server.ListenAndServeTLS(s.config.CrtFile, s.config.KeyFile))
+	log.Println(s.server.ListenAndServeTLS(s.config.Crt, s.config.Key))
 }
 
-func NewServer(cfg config.Server1) (*Server, error) {
+func NewServer(cfg *server.Server) (*Server, error) {
 	pool := x509.NewCertPool()
-	pool.AppendCertsFromPEM(cfg.CA)
+	caFile, err := os.Open(cfg.CaCrt)
+	if err != nil {
+		return nil, err
+	}
+
+	CA, err := ioutil.ReadAll(caFile)
+	if err != nil {
+		return nil, err
+	}
+
+	pool.AppendCertsFromPEM(CA)
 
 	handler := new(handler)
 
 	server := &Server{
 		server: http.Server{
-			Addr:    fmt.Sprintf("%s:%d", cfg.BindAddr, cfg.BindPort),
+			Addr:    net.JoinHostPort(cfg.ListenAddr, strconv.Itoa(cfg.ListenPort)),
 			Handler: handler,
 			TLSConfig: &tls.Config{
 				ClientCAs:  pool,
@@ -153,14 +165,14 @@ func NewServer(cfg config.Server1) (*Server, error) {
 			},
 		},
 
-		config: cfg,
+		config: *cfg,
 	}
 
 	handler.server = server
 
 	if cfg.DNS != "" {
 		dns.Resolver.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
-			return net.Dial(cfg.Net, cfg.DNS)
+			return net.Dial(cfg.DNSType, cfg.DNS)
 		}
 	}
 
