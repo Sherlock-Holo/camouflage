@@ -5,8 +5,10 @@ import (
 	"net"
 )
 
+type Type int
+
 const (
-	SOCKS = iota
+	SOCKS Type = iota
 	SHADOWSOCKS_CHACHA20_IETF
 )
 
@@ -22,7 +24,7 @@ type Frontend interface {
 	CloseRead() error
 }
 
-var Frontends = map[int]func(conn net.Conn, key []byte) (Frontend, error){
+var Frontends = map[Type]func(conn net.Conn, key []byte) (Frontend, error){
 	SOCKS: NewSocks,
 	SHADOWSOCKS_CHACHA20_IETF: NewShadowsocks,
 }
