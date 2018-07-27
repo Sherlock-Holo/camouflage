@@ -3,11 +3,11 @@ package client
 import (
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"strconv"
 	"sync/atomic"
+	"time"
 )
 
 type Monitor struct {
@@ -22,6 +22,17 @@ func (m *Monitor) report(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, fmt.Sprintf(reportFormant, atomic.LoadInt32(&m.tcpConnections), atomic.LoadInt32(&m.baseConnections)))
 }
 
-func (m *Monitor) start(addr string, port int) {
-	log.Println("monitor init:", http.ListenAndServe(net.JoinHostPort(addr, strconv.Itoa(port)), http.HandlerFunc(m.report)))
+func (m *Monitor) start(addr string, port int) (err error) {
+	// log.Println("monitor init:", http.ListenAndServe(net.JoinHostPort(addr, strconv.Itoa(port)), http.HandlerFunc(m.report)))
+	go func() {
+		err = http.ListenAndServe(net.JoinHostPort(addr, strconv.Itoa(port)), http.HandlerFunc(m.report))
+	}()
+
+	time.Sleep(time.Second)
+
+	if err != nil {
+		return fmt.Errorf("monitor init: %s", err)
+	}
+
+	return
 }

@@ -108,7 +108,10 @@ func New(cfg *client.Client) (*Client, error) {
 
 	if cfg.MonitorPort != 0 && cfg.MonitorAddr != "" {
 		monitor = new(Monitor)
-		go monitor.start(cfg.MonitorAddr, cfg.MonitorPort)
+		if err = monitor.start(cfg.MonitorAddr, cfg.MonitorPort); err != nil {
+			log.Println(err)
+			monitor = nil
+		}
 	}
 
 	listeners := make(map[frontend.Type][]ListenerInfo)
