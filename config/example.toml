@@ -3,6 +3,8 @@ remote_addr = "127.0.0.1"
 remote_port = 9876
 path = "/websocket"
 
+max_links = 100
+
 ca_crt = "../script/ca/ca.crt"
 
 crt = "../script/client/client.crt"
@@ -10,14 +12,12 @@ key = "../script/client/client.key"
 
     [client.ss]
     type = "ss"
-    max_links = 100
     listen_addr = "127.0.0.1"
     listen_port = 9876
     key = "holo"
 
     [client.socks]
     type = "socks"
-    max_links = 100
     listen_addr = "127.0.0.1"
     listen_port = 9875
 
