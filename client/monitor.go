@@ -15,11 +15,13 @@ type Monitor struct {
 	baseConnections int32
 }
 
-const reportFormant = `TCP connections: %d
-Base connections: %d`
+const reportFormat = `
+TCP connections: %d
+Base connections: %d
+`
 
 func (m *Monitor) report(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, fmt.Sprintf(reportFormant, atomic.LoadInt32(&m.tcpConnections), atomic.LoadInt32(&m.baseConnections)))
+	io.WriteString(w, fmt.Sprintf(reportFormat, atomic.LoadInt32(&m.tcpConnections), atomic.LoadInt32(&m.baseConnections)))
 }
 
 func (m *Monitor) start(addr string, port int) (err error) {
