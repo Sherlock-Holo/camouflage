@@ -15,8 +15,7 @@ type Monitor struct {
 	baseConnections int32
 }
 
-const reportFormat = `
-TCP connections: %d
+const reportFormat = `TCP connections: %d
 Base connections: %d
 `
 
@@ -25,7 +24,9 @@ func (m *Monitor) report(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Monitor) start(addr string, port int) {
-	go log.Println(http.ListenAndServe(net.JoinHostPort(addr, strconv.Itoa(port)), http.HandlerFunc(m.report)))
+	go func() {
+		log.Println(http.ListenAndServe(net.JoinHostPort(addr, strconv.Itoa(port)), http.HandlerFunc(m.report)))
+	}()
 }
 
 func (m *Monitor) updateMonitor(tcpConnChange, baseConnChange int32) {
