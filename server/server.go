@@ -139,7 +139,7 @@ func (s *Server) Run() {
 	log.Println(s.server.ListenAndServeTLS(s.config.Crt, s.config.Key))
 }
 
-func NewServer(cfg *server.Server) (*Server, error) {
+func New(cfg *server.Server) (*Server, error) {
 	pool := x509.NewCertPool()
 	caFile, err := os.Open(cfg.CaCrt)
 	if err != nil {
