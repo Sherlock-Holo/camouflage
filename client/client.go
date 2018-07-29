@@ -13,7 +13,6 @@ import (
 	"os"
 	"strconv"
 	"sync"
-	"sync/atomic"
 
 	"github.com/Sherlock-Holo/camouflage/ca"
 	"github.com/Sherlock-Holo/camouflage/config/client"
@@ -43,8 +42,7 @@ type Client struct {
 func New(cfg *client.Client) (*Client, error) {
 	var (
 		shadowsocksListeners []ListenerInfo
-
-		socksListeners []ListenerInfo
+		socksListeners       []ListenerInfo
 	)
 
 	cipherInfo := streamencrypt.Ciphers[streamencrypt.CHACHA20_IETF]
@@ -67,7 +65,10 @@ func New(cfg *client.Client) (*Client, error) {
 			return nil, err
 		}
 
-		socksListeners = append(socksListeners, ListenerInfo{Key: nil, Listener: listener})
+		socksListeners = append(socksListeners, ListenerInfo{
+			Key:      nil,
+			Listener: listener,
+		})
 	}
 
 	wsURL := (&url.URL{
@@ -172,10 +173,8 @@ func (c *Client) realNewLink(count int) (*link.Link, *base, error) {
 
 		// base is closed
 		if base.manager.IsClosed() {
-			// report to monitor
-			if c.monitor != nil {
-				atomic.AddInt32(&c.monitor.baseConnections, -1)
-			}
+			// report to Monitor
+			updateMonitor(c.monitor, 0, -1)
 			continue
 		}
 
@@ -189,10 +188,8 @@ func (c *Client) realNewLink(count int) (*link.Link, *base, error) {
 			go base.manager.Close()
 			c.poolLock.Unlock()
 
-			// report to monitor
-			if c.monitor != nil {
-				atomic.AddInt32(&c.monitor.baseConnections, -1)
-			}
+			// report to Monitor
+			updateMonitor(c.monitor, 0, -1)
 
 			return c.realNewLink(count + 1)
 		}
@@ -225,10 +222,8 @@ func (c *Client) realNewLink(count int) (*link.Link, *base, error) {
 	heap.Push(c.pool, base)
 	c.poolLock.Unlock()
 
-	// report to monitor
-	if c.monitor != nil {
-		atomic.AddInt32(&c.monitor.baseConnections, 1)
-	}
+	// report to Monitor
+	updateMonitor(c.monitor, 0, 1)
 
 	return l, base, nil
 }
@@ -275,10 +270,8 @@ func (c *Client) handle(conn net.Conn, frontendType frontend.Type, key []byte) {
 		once       = sync.Once{}
 	)
 
-	// report to monitor
-	if c.monitor != nil {
-		atomic.AddInt32(&c.monitor.tcpConnections, 1)
-	}
+	// report to Monitor
+	updateMonitor(c.monitor, 1, 0)
 
 	go func() {
 		if _, err := io.Copy(l, fe); err != nil {
@@ -329,10 +322,8 @@ func (c *Client) handle(conn net.Conn, frontendType frontend.Type, key []byte) {
 	fe.Close()
 	l.Close()
 
-	// report to monitor
-	if c.monitor != nil {
-		atomic.AddInt32(&c.monitor.tcpConnections, -1)
-	}
+	// report to Monitor
+	updateMonitor(c.monitor, -1, 0)
 
 	c.errorHandle(fe, l, base)
 	return
@@ -345,10 +336,8 @@ func (c *Client) errorHandle(socks, link io.ReadWriteCloser, base *base) {
 		if base.manager.IsClosed() {
 			heap.Remove(c.pool, base.index)
 
-			// report to monitor
-			if c.monitor != nil {
-				atomic.AddInt32(&c.monitor.baseConnections, -1)
-			}
+			// report to Monitor
+			updateMonitor(c.monitor, 0, -1)
 
 			c.poolLock.Unlock()
 			return
@@ -362,10 +351,8 @@ func (c *Client) errorHandle(socks, link io.ReadWriteCloser, base *base) {
 				go base.manager.Close()
 				heap.Remove(c.pool, base.index)
 
-				// report to monitor
-				if c.monitor != nil {
-					atomic.AddInt32(&c.monitor.baseConnections, -1)
-				}
+				// report to Monitor
+				updateMonitor(c.monitor, 0, -1)
 
 			} else {
 				heap.Fix(c.pool, base.index)

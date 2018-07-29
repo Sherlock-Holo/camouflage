@@ -23,7 +23,6 @@ func (m *Monitor) report(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Monitor) start(addr string, port int) (err error) {
-	// log.Println("monitor init:", http.ListenAndServe(net.JoinHostPort(addr, strconv.Itoa(port)), http.HandlerFunc(m.report)))
 	go func() {
 		err = http.ListenAndServe(net.JoinHostPort(addr, strconv.Itoa(port)), http.HandlerFunc(m.report))
 	}()
@@ -35,4 +34,13 @@ func (m *Monitor) start(addr string, port int) (err error) {
 	}
 
 	return
+}
+
+func updateMonitor(monitor *Monitor, tcpConnChange, baseConnChange int32) {
+	if monitor == nil {
+		return
+	}
+
+	atomic.AddInt32(&monitor.tcpConnections, tcpConnChange)
+	atomic.AddInt32(&monitor.baseConnections, baseConnChange)
 }

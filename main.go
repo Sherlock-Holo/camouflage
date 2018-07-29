@@ -45,7 +45,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		s, err := server.NewServer(cfg)
+		s, err := server.New(cfg)
 		if err != nil {
 			log.Fatal(err)
 		}
