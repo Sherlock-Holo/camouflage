@@ -109,10 +109,7 @@ func New(cfg *client.Client) (*Client, error) {
 
 	if cfg.MonitorPort != 0 && cfg.MonitorAddr != "" {
 		monitor = new(Monitor)
-		if err = monitor.start(cfg.MonitorAddr, cfg.MonitorPort); err != nil {
-			log.Println(err)
-			monitor = nil
-		}
+		monitor.start(cfg.MonitorAddr, cfg.MonitorPort)
 	}
 
 	listeners := make(map[frontend.Type][]ListenerInfo)
@@ -174,7 +171,7 @@ func (c *Client) realNewLink(count int) (*link.Link, *base, error) {
 		// base is closed
 		if base.manager.IsClosed() {
 			// report to Monitor
-			updateMonitor(c.monitor, 0, -1)
+			c.monitor.updateMonitor(0, -1)
 			continue
 		}
 
@@ -189,7 +186,7 @@ func (c *Client) realNewLink(count int) (*link.Link, *base, error) {
 			c.poolLock.Unlock()
 
 			// report to Monitor
-			updateMonitor(c.monitor, 0, -1)
+			c.monitor.updateMonitor(0, -1)
 
 			return c.realNewLink(count + 1)
 		}
@@ -223,7 +220,7 @@ func (c *Client) realNewLink(count int) (*link.Link, *base, error) {
 	c.poolLock.Unlock()
 
 	// report to Monitor
-	updateMonitor(c.monitor, 0, 1)
+	c.monitor.updateMonitor(0, 1)
 
 	return l, base, nil
 }
@@ -271,7 +268,7 @@ func (c *Client) handle(conn net.Conn, frontendType frontend.Type, key []byte) {
 	)
 
 	// report to Monitor
-	updateMonitor(c.monitor, 1, 0)
+	c.monitor.updateMonitor(1, 0)
 
 	go func() {
 		if _, err := io.Copy(l, fe); err != nil {
@@ -323,7 +320,7 @@ func (c *Client) handle(conn net.Conn, frontendType frontend.Type, key []byte) {
 	l.Close()
 
 	// report to Monitor
-	updateMonitor(c.monitor, -1, 0)
+	c.monitor.updateMonitor(-1, 0)
 
 	c.errorHandle(fe, l, base)
 	return
@@ -337,7 +334,7 @@ func (c *Client) errorHandle(socks, link io.ReadWriteCloser, base *base) {
 			heap.Remove(c.pool, base.index)
 
 			// report to Monitor
-			updateMonitor(c.monitor, 0, -1)
+			c.monitor.updateMonitor(0, -1)
 
 			c.poolLock.Unlock()
 			return
@@ -352,7 +349,7 @@ func (c *Client) errorHandle(socks, link io.ReadWriteCloser, base *base) {
 				heap.Remove(c.pool, base.index)
 
 				// report to Monitor
-				updateMonitor(c.monitor, 0, -1)
+				c.monitor.updateMonitor(0, -1)
 
 			} else {
 				heap.Fix(c.pool, base.index)
