@@ -155,11 +155,11 @@ func (c *Client) Run() {
 	<-make(chan struct{})
 }
 
-func (c *Client) newLink() (*link.Link, *base, error) {
-	return c.realNewLink(0)
+func (c *Client) Dial() (*link.Link, *base, error) {
+	return c.realDial(0)
 }
 
-func (c *Client) realNewLink(count int) (*link.Link, *base, error) {
+func (c *Client) realDial(count int) (*link.Link, *base, error) {
 	if count > 10 {
 		return nil, nil, errors.New("new Link failed")
 	}
@@ -180,7 +180,7 @@ func (c *Client) realNewLink(count int) (*link.Link, *base, error) {
 			break
 		}
 
-		l, err := base.manager.NewLink()
+		l, err := base.manager.Dial()
 		if err != nil {
 			go base.manager.Close()
 			c.poolLock.Unlock()
@@ -188,7 +188,7 @@ func (c *Client) realNewLink(count int) (*link.Link, *base, error) {
 			// report to Monitor
 			c.monitor.updateMonitor(0, -1)
 
-			return c.realNewLink(count + 1)
+			return c.realDial(count + 1)
 		}
 
 		base.count++
@@ -201,7 +201,7 @@ func (c *Client) realNewLink(count int) (*link.Link, *base, error) {
 
 	conn, _, err := c.wsDialer.Dial(c.wsURL, nil)
 	if err != nil {
-		return c.realNewLink(count + 1)
+		return c.realDial(count + 1)
 	}
 
 	base := &base{
@@ -209,10 +209,10 @@ func (c *Client) realNewLink(count int) (*link.Link, *base, error) {
 		count:   1,
 	}
 
-	l, err := base.manager.NewLink()
+	l, err := base.manager.Dial()
 	if err != nil {
 		go base.manager.Close()
-		return c.realNewLink(count + 1)
+		return c.realDial(count + 1)
 	}
 
 	c.poolLock.Lock()
@@ -233,7 +233,7 @@ func (c *Client) handle(conn net.Conn, frontendType frontend.Type, key []byte) {
 		return
 	}
 
-	l, base, err := c.newLink()
+	l, base, err := c.Dial()
 	if err != nil {
 		log.Println(err)
 		fe.Handshake(false)
