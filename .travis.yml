@@ -4,7 +4,7 @@ go:
   - master
   
 before_install:
-    - go get -t -v ./...
+    - GO111MODULE=on go get -t -v ./...
     
 install:
     - CGO_ENABLED=0 GO111MODULE=on go get github.com/Sherlock-Holo/camouflage
