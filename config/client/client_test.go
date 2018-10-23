@@ -6,11 +6,11 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	client, err := New("/home/sherlock/go/src/github.com/Sherlock-Holo/camouflage/config/example.toml")
+	client, err := New("/home/sherlock/git/camouflage/config/example.toml")
 	if err != nil {
 		log.Println(err)
 		t.Fail()
 	}
 
-	t.Log(client)
+	t.Logf("%+v\n", client)
 }

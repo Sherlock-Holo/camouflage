@@ -32,8 +32,10 @@ type handler struct {
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if !websocket.IsWebSocketUpgrade(r) {
-		w.WriteHeader(http.StatusForbidden)
+	if r.Header.Get("token") != h.server.config.Token || !websocket.IsWebSocketUpgrade(r) {
+		log.Println("an invalid request is detected from", r.RemoteAddr)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		io.WriteString(w, "<h1>this is a test page</h1>")
 		return
 	}
 
@@ -140,18 +142,24 @@ func (s *Server) Run() {
 }
 
 func New(cfg *server.Server) (*Server, error) {
-	pool := x509.NewCertPool()
-	caFile, err := os.Open(cfg.CaCrt)
+	pool, err := x509.SystemCertPool()
 	if err != nil {
 		return nil, err
 	}
 
-	CA, err := ioutil.ReadAll(caFile)
-	if err != nil {
-		return nil, err
-	}
+	if cfg.CaCrt != "" {
+		caFile, err := os.Open(cfg.CaCrt)
+		if err != nil {
+			return nil, err
+		}
 
-	pool.AppendCertsFromPEM(CA)
+		CA, err := ioutil.ReadAll(caFile)
+		if err != nil {
+			return nil, err
+		}
+
+		pool.AppendCertsFromPEM(CA)
+	}
 
 	handler := new(handler)
 
@@ -160,8 +168,7 @@ func New(cfg *server.Server) (*Server, error) {
 			Addr:    net.JoinHostPort(cfg.ListenAddr, strconv.Itoa(cfg.ListenPort)),
 			Handler: handler,
 			TLSConfig: &tls.Config{
-				ClientCAs:  pool,
-				ClientAuth: tls.RequireAndVerifyClientCert,
+				ClientCAs: pool,
 			},
 		},
 

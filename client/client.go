@@ -4,17 +4,14 @@ import (
 	"container/heap"
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
+	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"sync"
 
-	"github.com/Sherlock-Holo/camouflage/ca"
 	"github.com/Sherlock-Holo/camouflage/config/client"
 	"github.com/Sherlock-Holo/camouflage/frontend"
 	websocket2 "github.com/Sherlock-Holo/goutils/websocket"
@@ -30,6 +27,8 @@ type Client struct {
 
 	wsURL    string
 	wsDialer websocket.Dialer
+
+	token string
 
 	pool     *baseHeap
 	poolLock sync.Mutex
@@ -77,37 +76,14 @@ func New(cfg *client.Client) (*Client, error) {
 		Path:   cfg.Path,
 	}).String()
 
-	certificate, err := tls.LoadX509KeyPair(cfg.Crt, cfg.Key)
-	if err != nil {
-		return nil, err
-	}
-
-	caFile, err := os.Open(cfg.CaCrt)
-	if err != nil {
-		return nil, err
-	}
-	defer caFile.Close()
-
-	CA, err := ioutil.ReadAll(caFile)
-	if err != nil {
-		return nil, err
-	}
-
-	pool, err := ca.InitCAPool(CA)
-	if err != nil {
-		return nil, fmt.Errorf("Init CA Pool: %s\n", err)
-	}
-
 	dialer := websocket.Dialer{
-		TLSClientConfig: &tls.Config{
-			RootCAs:      pool,
-			Certificates: []tls.Certificate{certificate},
-		},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 
 	var monitor *Monitor
 
 	if cfg.MonitorPort != 0 && cfg.MonitorAddr != "" {
+		log.Printf("start monitor on %s", net.JoinHostPort(cfg.MonitorAddr, strconv.Itoa(cfg.MonitorPort)))
 		monitor = new(Monitor)
 		monitor.start(cfg.MonitorAddr, cfg.MonitorPort)
 	}
@@ -127,6 +103,8 @@ func New(cfg *client.Client) (*Client, error) {
 
 		wsURL:    wsURL,
 		wsDialer: dialer,
+
+		token: cfg.Token,
 
 		pool: new(baseHeap),
 
@@ -171,7 +149,9 @@ func (c *Client) realDial(count int) (*link.Link, *base, error) {
 		// base is closed
 		if base.manager.IsClosed() {
 			// report to Monitor
-			c.monitor.updateMonitor(0, -1)
+			if c.monitor != nil {
+				c.monitor.updateMonitor(0, -1)
+			}
 			continue
 		}
 
@@ -186,7 +166,9 @@ func (c *Client) realDial(count int) (*link.Link, *base, error) {
 			c.poolLock.Unlock()
 
 			// report to Monitor
-			c.monitor.updateMonitor(0, -1)
+			if c.monitor != nil {
+				c.monitor.updateMonitor(0, -1)
+			}
 
 			return c.realDial(count + 1)
 		}
@@ -199,7 +181,9 @@ func (c *Client) realDial(count int) (*link.Link, *base, error) {
 	}
 	c.poolLock.Unlock()
 
-	conn, _, err := c.wsDialer.Dial(c.wsURL, nil)
+	httpHeader := http.Header{}
+	httpHeader.Add("token", c.token)
+	conn, _, err := c.wsDialer.Dial(c.wsURL, httpHeader)
 	if err != nil {
 		return c.realDial(count + 1)
 	}
@@ -220,7 +204,9 @@ func (c *Client) realDial(count int) (*link.Link, *base, error) {
 	c.poolLock.Unlock()
 
 	// report to Monitor
-	c.monitor.updateMonitor(0, 1)
+	if c.monitor != nil {
+		c.monitor.updateMonitor(0, 1)
+	}
 
 	return l, base, nil
 }
@@ -268,7 +254,9 @@ func (c *Client) handle(conn net.Conn, frontendType frontend.Type, key []byte) {
 	)
 
 	// report to Monitor
-	c.monitor.updateMonitor(1, 0)
+	if c.monitor != nil {
+		c.monitor.updateMonitor(1, 0)
+	}
 
 	go func() {
 		if _, err := io.Copy(l, fe); err != nil {
@@ -320,7 +308,9 @@ func (c *Client) handle(conn net.Conn, frontendType frontend.Type, key []byte) {
 	l.Close()
 
 	// report to Monitor
-	c.monitor.updateMonitor(-1, 0)
+	if c.monitor != nil {
+		c.monitor.updateMonitor(-1, 0)
+	}
 
 	c.errorHandle(fe, l, base)
 	return
@@ -334,7 +324,9 @@ func (c *Client) errorHandle(socks, link io.ReadWriteCloser, base *base) {
 			heap.Remove(c.pool, base.index)
 
 			// report to Monitor
-			c.monitor.updateMonitor(0, -1)
+			if c.monitor != nil {
+				c.monitor.updateMonitor(0, -1)
+			}
 
 			c.poolLock.Unlock()
 			return
@@ -349,7 +341,9 @@ func (c *Client) errorHandle(socks, link io.ReadWriteCloser, base *base) {
 				heap.Remove(c.pool, base.index)
 
 				// report to Monitor
-				c.monitor.updateMonitor(0, -1)
+				if c.monitor != nil {
+					c.monitor.updateMonitor(0, -1)
+				}
 
 			} else {
 				heap.Fix(c.pool, base.index)

@@ -5,10 +5,10 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	server, err := New("/home/sherlock/go/src/github.com/Sherlock-Holo/camouflage/config/example.toml")
+	server, err := New("/home/sherlock/git/camouflage/config/example.toml")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Log(server)
+	t.Logf("%+v\n", server)
 }
