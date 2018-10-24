@@ -13,9 +13,8 @@ type Server struct {
 
 	Token string
 
-	CaCrt string `toml:"ca_crt"`
-	Crt   string `toml:"crt"`
-	Key   string `toml:"key"`
+	Crt string `toml:"crt"`
+	Key string `toml:"key"`
 
 	DNS     string `toml:"dns"`
 	DNSType string `toml:"dns_type"`
@@ -36,12 +35,6 @@ func New(path string) (*Server, error) {
 
 	// read token
 	server.Token = tree.Get("token").(string)
-
-	if server.CaCrt != "" {
-		if !filepath.IsAbs(server.CaCrt) {
-			server.CaCrt = filepath.Join(filepath.Dir(path), server.CaCrt)
-		}
-	}
 
 	if !filepath.IsAbs(server.Crt) {
 		server.Crt = filepath.Join(filepath.Dir(path), server.Crt)

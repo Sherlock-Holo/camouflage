@@ -2,15 +2,11 @@ package server
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"io"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 
 	"github.com/Sherlock-Holo/camouflage/config/server"
@@ -22,24 +18,20 @@ import (
 )
 
 type Server struct {
-	server http.Server
 	config server.Server
-}
 
-type handler struct {
-	server   *Server
 	upgrader websocket.Upgrader
 }
 
-func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("token") != h.server.config.Token || !websocket.IsWebSocketUpgrade(r) {
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("token") != s.config.Token || !websocket.IsWebSocketUpgrade(r) {
 		log.Println("an invalid request is detected from", r.RemoteAddr)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		io.WriteString(w, "<h1>this is a test page</h1>")
 		return
 	}
 
-	conn, err := h.upgrader.Upgrade(w, r, nil)
+	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		conn.Close()
@@ -56,11 +48,11 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		go handle(h, l)
+		go handle(s, l)
 	}
 }
 
-func handle(handler *handler, l *link.Link) {
+func handle(handler *Server, l *link.Link) {
 	address, err := libsocks.DecodeFrom(l)
 	if err != nil {
 		log.Println(err)
@@ -68,7 +60,7 @@ func handle(handler *handler, l *link.Link) {
 		return
 	}
 
-	if handler.server.config.DNS != "" {
+	if handler.config.DNS != "" {
 		if address.Type == 3 {
 			if addrs, err := dns.Resolver.LookupIPAddr(context.Background(), address.Host); err == nil {
 				if dns.HasPublicIPv6() {
@@ -138,44 +130,27 @@ func handle(handler *handler, l *link.Link) {
 }
 
 func (s *Server) Run() {
-	log.Println(s.server.ListenAndServeTLS(s.config.Crt, s.config.Key))
+	mux := http.NewServeMux()
+	mux.HandleFunc(s.config.Path, s.ServeHTTP)
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("an invalid request is detected from", r.RemoteAddr)
+		http.NotFound(w, r)
+	})
+
+	log.Println(http.ListenAndServeTLS(
+		net.JoinHostPort(s.config.ListenAddr, strconv.Itoa(s.config.ListenPort)),
+		s.config.Crt,
+		s.config.Key,
+		mux,
+	),
+	)
 }
 
 func New(cfg *server.Server) (*Server, error) {
-	pool, err := x509.SystemCertPool()
-	if err != nil {
-		return nil, err
-	}
-
-	if cfg.CaCrt != "" {
-		caFile, err := os.Open(cfg.CaCrt)
-		if err != nil {
-			return nil, err
-		}
-
-		CA, err := ioutil.ReadAll(caFile)
-		if err != nil {
-			return nil, err
-		}
-
-		pool.AppendCertsFromPEM(CA)
-	}
-
-	handler := new(handler)
-
-	server := &Server{
-		server: http.Server{
-			Addr:    net.JoinHostPort(cfg.ListenAddr, strconv.Itoa(cfg.ListenPort)),
-			Handler: handler,
-			TLSConfig: &tls.Config{
-				ClientCAs: pool,
-			},
-		},
-
+	s := &Server{
 		config: *cfg,
 	}
-
-	handler.server = server
 
 	if cfg.DNS != "" {
 		dns.Resolver.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
@@ -183,5 +158,5 @@ func New(cfg *server.Server) (*Server, error) {
 		}
 	}
 
-	return server, nil
+	return s, nil
 }

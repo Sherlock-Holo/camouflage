@@ -3,6 +3,7 @@ package client
 import (
 	"github.com/Sherlock-Holo/camouflage/frontend"
 	"github.com/pelletier/go-toml"
+	"path/filepath"
 )
 
 type Client struct {
@@ -13,6 +14,8 @@ type Client struct {
 	MaxLinks int `toml:"max_links"`
 
 	Token string
+
+	SelfCA string `toml:"self_ca"`
 
 	MonitorAddr string `toml:"monitor_addr"`
 	MonitorPort int    `toml:"monitor_port"`
@@ -36,6 +39,13 @@ func New(path string) (*Client, error) {
 
 	// read token
 	client.Token = tree.Get("token").(string)
+
+	// read SelfCA
+	if client.SelfCA != "" {
+		if !filepath.IsAbs(client.SelfCA) {
+			client.SelfCA = filepath.Join(filepath.Dir(path), client.SelfCA)
+		}
+	}
 
 	clientMap := clientTree.ToMap()
 	treeMap := make(map[frontend.Type][]*toml.Tree)

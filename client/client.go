@@ -3,8 +3,10 @@ package client
 import (
 	"container/heap"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -12,6 +14,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/Sherlock-Holo/camouflage/ca"
 	"github.com/Sherlock-Holo/camouflage/config/client"
 	"github.com/Sherlock-Holo/camouflage/frontend"
 	websocket2 "github.com/Sherlock-Holo/goutils/websocket"
@@ -76,8 +79,26 @@ func New(cfg *client.Client) (*Client, error) {
 		Path:   cfg.Path,
 	}).String()
 
+	pool, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, err
+	}
+
+	if cfg.SelfCA != "" {
+		selfCA, err := ioutil.ReadFile(cfg.SelfCA)
+		if err != nil {
+			return nil, err
+		}
+		pool, err = ca.InitCAPool(selfCA)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	dialer := websocket.Dialer{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig: &tls.Config{
+			RootCAs: pool,
+		},
 	}
 
 	var monitor *Monitor

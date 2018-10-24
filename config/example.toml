@@ -8,6 +8,10 @@ path = "/websocket"
 
 max_links = 100
 
+# if use self-signed certificate, un-comment to import self CA
+self_ca = "../script/ca/ca.crt"
+
+# un-comment to enable monitor
 #monitor_addr = "127.0.0.1"
 #monitor_port = 19998
 
@@ -27,9 +31,6 @@ max_links = 100
 listen_addr = "127.0.0.1"
 listen_port = 9876
 path = "/websocket"
-
-# if use normal tls certificate, ca_crt is not need
-ca_crt = "../script/ca/ca.crt"
 
 crt = "../script/server/server.crt"
 key = "../script/server/server.key"
