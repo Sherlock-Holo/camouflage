@@ -18,16 +18,18 @@ import (
 )
 
 type Server struct {
-	config server.Server
-
+	config   server.Server
 	upgrader websocket.Upgrader
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("token") != s.config.Token || !websocket.IsWebSocketUpgrade(r) {
-		log.Println("an invalid request is detected from", r.RemoteAddr)
+		/*log.Println("an invalid request is detected from", r.RemoteAddr)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		io.WriteString(w, "<h1>this is a test page</h1>")
+		io.WriteString(w, "<h1>this is a test page</h1>")*/
+		log.Println("an invalid request is detected from", r.RemoteAddr)
+		w.Header().Set("WWW-Authenticate", "Basic realm=\""+"please input user and password"+"\"")
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
