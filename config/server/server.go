@@ -18,6 +18,8 @@ type Server struct {
 
 	DNS     string `toml:"dns"`
 	DNSType string `toml:"dns_type"`
+
+	WebPage string `toml:"web_page"`
 }
 
 func New(path string) (*Server, error) {
@@ -42,6 +44,12 @@ func New(path string) (*Server, error) {
 
 	if !filepath.IsAbs(server.Key) {
 		server.Key = filepath.Join(filepath.Dir(path), server.Key)
+	}
+
+	if server.WebPage != "" {
+		if !filepath.IsAbs(server.WebPage) {
+			server.WebPage = filepath.Join(filepath.Dir(path), server.WebPage)
+		}
 	}
 
 	return server, nil

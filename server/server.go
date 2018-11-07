@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strconv"
 
 	"github.com/Sherlock-Holo/camouflage/config/server"
@@ -24,12 +25,7 @@ type Server struct {
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("token") != s.config.Token || !websocket.IsWebSocketUpgrade(r) {
-		/*log.Println("an invalid request is detected from", r.RemoteAddr)
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		io.WriteString(w, "<h1>this is a test page</h1>")*/
-		log.Println("an invalid request is detected from", r.RemoteAddr)
-		w.Header().Set("WWW-Authenticate", "Basic realm=\""+"please input user and password"+"\"")
-		w.WriteHeader(http.StatusUnauthorized)
+		s.invalidHandle(w, r)
 		return
 	}
 
@@ -52,6 +48,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		go handle(s, l)
 	}
+}
+
+func (s *Server) invalidHandle(w http.ResponseWriter, r *http.Request) {
+	log.Println("an invalid request is detected from", r.RemoteAddr)
+	if s.config.WebPage != "" {
+		http.ServeFile(w, r, filepath.Join(s.config.WebPage, r.URL.Path))
+	} else {
+		http.NotFound(w, r)
+	}
+	return
 }
 
 func handle(handler *Server, l *link.Link) {
@@ -133,12 +139,9 @@ func handle(handler *Server, l *link.Link) {
 
 func (s *Server) Run() {
 	mux := http.NewServeMux()
-	mux.HandleFunc(s.config.Path, s.ServeHTTP)
 
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("an invalid request is detected from", r.RemoteAddr)
-		http.NotFound(w, r)
-	})
+	mux.HandleFunc(s.config.Path, s.ServeHTTP)
+	mux.HandleFunc("/", s.invalidHandle)
 
 	log.Println(http.ListenAndServeTLS(
 		net.JoinHostPort(s.config.ListenAddr, strconv.Itoa(s.config.ListenPort)),

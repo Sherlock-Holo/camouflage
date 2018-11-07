@@ -37,3 +37,5 @@ key = "../script/server/server.key"
 
 dns_type = "udp"
 dns = "119.29.29.29:53"
+
+web_page = ""
