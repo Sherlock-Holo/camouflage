@@ -4,12 +4,14 @@ github.com/Sherlock-Holo/goutils v0.0.0-20180828013039-2447c3761d0f h1:1iThzSags
 github.com/Sherlock-Holo/goutils v0.0.0-20180828013039-2447c3761d0f/go.mod h1:XIQ0d16kdYVZLHtOrtDlgcYFDy337n4cmcfYTPIMrK4=
 github.com/Sherlock-Holo/libsocks v0.0.0-20180626024653-c6b26d141c92 h1:QcIgcPDGCeDKdbiDOdqMS+E9mAiG31lqJhBfZLw0C3w=
 github.com/Sherlock-Holo/libsocks v0.0.0-20180626024653-c6b26d141c92/go.mod h1:K+ljYF6lQEXf2wkTgBWhn8fZofPKrlxrWfFzSTTutJQ=
-github.com/Sherlock-Holo/link v0.2.0 h1:3yBXKk/Hp/FLNuZRy275OymiZazP4dWI0k+cXa3BBKQ=
-github.com/Sherlock-Holo/link v0.2.0/go.mod h1:BCMdAc824pGx7p0A7dMyY+QQWwr7P1+Ogp7YLlbhhcU=
+github.com/Sherlock-Holo/link v0.3.0 h1:bVV3W1o1grYvFJcxEQYoaTAuFttyr+rhse/kMK8ZAzQ=
+github.com/Sherlock-Holo/link v0.3.0/go.mod h1:TRqtw2S/5okbpl6JJQt4o/a+ypUk8WxapgevtOizuOc=
 github.com/Sherlock-Holo/streamencrypt v0.0.0-20180727033344-ececb59b4891 h1:q5wI6QtUzJHsMqMOUZ8Lc+pEaaw/B64DSM++Hgmxcrs=
 github.com/Sherlock-Holo/streamencrypt v0.0.0-20180727033344-ececb59b4891/go.mod h1:uuN2eB+JAu9YQErLyrUXX/xh1754RZDnp99FYLqMXxQ=
 github.com/Yawning/chacha20 v0.0.0-20170904085104-e3b1f968fc63 h1:I6/SJSN9wJMJ+ZyQaCHUlzoTA4ypU5Bb44YWR1wTY/0=
 github.com/Yawning/chacha20 v0.0.0-20170904085104-e3b1f968fc63/go.mod h1:nf+Komq6fVP4SwmKEaVGxHTyQGKREVlwjQKpvOV39yE=
+github.com/akutz/memconn v0.1.0 h1:NawI0TORU4hcOMsMr11g7vwlCdkYeLKXBcxWu2W/P8A=
+github.com/akutz/memconn v0.1.0/go.mod h1:Jo8rI7m0NieZyLI5e2CDlRdRqRRB4S7Xp77ukDjH+Fw=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/gorilla/websocket v1.4.0 h1:WDFjx/TMzVgy9VdMMQi2K2Emtwi2QcUQsztZ/zLaH/Q=
