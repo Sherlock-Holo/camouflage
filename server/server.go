@@ -23,9 +23,9 @@ type Server struct {
 	upgrader websocket.Upgrader
 }
 
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *Server) serviceProxy(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("token") != s.config.Token || !websocket.IsWebSocketUpgrade(r) {
-		s.invalidHandle(w, r)
+		s.serviceInvalid(w, r)
 		return
 	}
 
@@ -36,7 +36,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	manager := link.NewManager(websocket2.NewWrapper(conn), link.KeepaliveConfig)
+	manager := link.NewManager(websocket2.NewWrapper(conn), link.KeepaliveConfig())
 
 	for {
 		l, err := manager.Accept()
@@ -50,7 +50,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) invalidHandle(w http.ResponseWriter, r *http.Request) {
+func (s *Server) serviceInvalid(w http.ResponseWriter, r *http.Request) {
 	log.Println("an invalid request is detected from", r.RemoteAddr)
 	if s.config.WebPage != "" {
 		http.ServeFile(w, r, filepath.Join(s.config.WebPage, r.URL.Path))
@@ -117,31 +117,25 @@ func handle(handler *Server, l *link.Link) {
 	go func() {
 		if _, err := io.Copy(remote, l); err != nil {
 			log.Println(err)
-			remote.Close()
-			l.Close()
-			return
 		}
-
-		remote.(*net.TCPConn).CloseWrite()
+		l.Close()
+		remote.Close()
 	}()
 
 	go func() {
 		if _, err := io.Copy(l, remote); err != nil {
 			log.Println(err)
-			remote.Close()
-			l.Close()
-			return
 		}
-
-		l.CloseWrite()
+		l.Close()
+		remote.Close()
 	}()
 }
 
 func (s *Server) Run() {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc(s.config.Path, s.ServeHTTP)
-	mux.HandleFunc("/", s.invalidHandle)
+	mux.HandleFunc(s.config.Path, s.serviceProxy)
+	mux.HandleFunc("/", s.serviceInvalid)
 
 	log.Println(http.ListenAndServeTLS(
 		net.JoinHostPort(s.config.ListenAddr, strconv.Itoa(s.config.ListenPort)),

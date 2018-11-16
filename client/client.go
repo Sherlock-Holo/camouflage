@@ -210,7 +210,7 @@ func (c *Client) realDial(count int) (*link.Link, *base, error) {
 	}
 
 	base := &base{
-		manager: link.NewManager(websocket2.NewWrapper(conn), link.KeepaliveConfig),
+		manager: link.NewManager(websocket2.NewWrapper(conn), link.KeepaliveConfig()),
 		count:   1,
 	}
 
@@ -268,12 +268,6 @@ func (c *Client) handle(conn net.Conn, frontendType frontend.Type, key []byte) {
 		return
 	}
 
-	var (
-		closeCount = make(chan struct{}, 2)
-		die        = make(chan struct{})
-		once       = sync.Once{}
-	)
-
 	// report to Monitor
 	if c.monitor != nil {
 		c.monitor.updateMonitor(1, 0)
@@ -282,51 +276,18 @@ func (c *Client) handle(conn net.Conn, frontendType frontend.Type, key []byte) {
 	go func() {
 		if _, err := io.Copy(l, fe); err != nil {
 			log.Println(err)
-
-			select {
-			case <-die:
-			default:
-				once.Do(func() {
-					close(die)
-				})
-			}
-			return
 		}
-
-		l.CloseWrite()
-		fe.CloseRead()
-		closeCount <- struct{}{}
+		fe.Close()
+		l.Close()
 	}()
 
 	go func() {
 		if _, err := io.Copy(fe, l); err != nil {
 			log.Println(err)
-
-			select {
-			case <-die:
-			default:
-				once.Do(func() {
-					close(die)
-				})
-			}
-			return
 		}
-
-		fe.CloseWrite()
-		closeCount <- struct{}{}
+		fe.Close()
+		l.Close()
 	}()
-
-	for i := 0; i < 2; i++ {
-		select {
-		case <-die:
-			break
-
-		case <-closeCount:
-		}
-	}
-
-	fe.Close()
-	l.Close()
 
 	// report to Monitor
 	if c.monitor != nil {
