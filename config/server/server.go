@@ -12,7 +12,8 @@ type Config struct {
 	DNS     string `toml:"dns"`
 	DNSType string `toml:"dns_type"`
 
-	Services map[string][]*Service `toml:"ignore"`
+	TLSServices   map[string][]*Service `toml:"ignore"`
+	NoTLSServices map[string][]*Service `toml:"ignore"`
 }
 
 type Service struct {
@@ -21,7 +22,9 @@ type Service struct {
 	ListenAddr string `toml:"listen_addr"`
 	ListenPort int    `toml:"listen_port"`
 
-	Type string
+	DisableInvalidLog bool `toml:"disable_invalid_request_log"`
+
+	NoTLS bool `toml:"no_tls"`
 
 	Token string
 	Path  string
@@ -46,7 +49,8 @@ func New(path string) (*Config, error) {
 	if err = serverTree.Unmarshal(config); err != nil {
 		return nil, err
 	}
-	config.Services = make(map[string][]*Service)
+	config.TLSServices = make(map[string][]*Service)
+	config.NoTLSServices = make(map[string][]*Service)
 
 	for name, s := range serverTree.ToMap() {
 		switch value := s.(type) {
@@ -61,11 +65,29 @@ func New(path string) (*Config, error) {
 			}
 			service.ServiceName = name
 			addr := net.JoinHostPort(service.ListenAddr, strconv.Itoa(service.ListenPort))
-			config.Services[addr] = append(config.Services[addr], service)
+
+			if !service.NoTLS {
+				config.TLSServices[addr] = append(config.TLSServices[addr], service)
+			} else {
+				config.NoTLSServices[addr] = append(config.NoTLSServices[addr], service)
+			}
 		}
 	}
 
-	for _, services := range config.Services {
+	for _, services := range config.TLSServices {
+		for i := range services {
+			if !filepath.IsAbs(services[i].Crt) {
+				services[i].Crt = filepath.Join(filepath.Dir(path), services[i].Crt)
+				services[i].Key = filepath.Join(filepath.Dir(path), services[i].Key)
+
+				if services[i].WebRoot != "" && !filepath.IsAbs(services[i].WebRoot) {
+					services[i].WebRoot = filepath.Join(filepath.Dir(path), services[i].WebRoot)
+				}
+			}
+		}
+	}
+
+	for _, services := range config.NoTLSServices {
 		for i := range services {
 			if !filepath.IsAbs(services[i].Crt) {
 				services[i].Crt = filepath.Join(filepath.Dir(path), services[i].Crt)

@@ -33,12 +33,13 @@ dns = "119.29.29.29:53"
 
 
 [server.camouflage]
-type = "camouflage"
-
 host = "camouflage.example.com"
 
 listen_addr = "127.0.0.1"
 listen_port = 9876
+
+# disable invalid reqeust log if you don't like this log, default is false
+#disable_invalid_request_log = true
 
 crt = "../script/server/server.crt"
 key = "../script/server/server.key"
@@ -46,31 +47,35 @@ key = "../script/server/server.key"
 token = "HmKThr6ZQUeIXl12CVTXnOLJ0bA0ow-BqLOWjwYDhNs"
 path = "/websocket"
 
-web_root = "test"
+web_root = "/home/sherlock/git/blog/output"
 
-[server.web]
-type = "web"
 
-host = "www.example.com"
+[server.camouflage2]
+host = "camouflage2.example.com"
 
 listen_addr = "127.0.0.1"
 listen_port = 9876
 
+disable_invalid_request_log = true
+
 crt = "../script/server/server.crt"
 key = "../script/server/server.key"
 
-web_root = "test2"
+token = "HmKThr6ZQUeIXl12CVTXnOLJ0bA0ow-BqLOWjwYDhNs"
+path = "/websocket"
+
+web_root = "/home/sherlock/git/blog/output"
 
 
-[server.web2]
-type = "web"
-
-host = "test.example.com"
-
+[server.camouflage-notls]
 listen_addr = "127.0.0.1"
-listen_port = 9875
+listen_port = 9877
 
-crt = "../script/server/server.crt"
-key = "../script/server/server.key"
+disable_invalid_request_log = true
 
-web_root = ""
+no_tls = true
+
+token = "HmKThr6ZQUeIXl12CVTXnOLJ0bA0ow-BqLOWjwYDhNs"
+path = "/websocket"
+
+web_root = "/home/sherlock/git/blog/output"
