@@ -2,16 +2,17 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"io"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
 	"net/http"
 	"path/filepath"
-	"strconv"
 
 	"github.com/Sherlock-Holo/camouflage/config/server"
-	"github.com/Sherlock-Holo/camouflage/dns"
+	"github.com/Sherlock-Holo/camouflage/nic"
 	websocket2 "github.com/Sherlock-Holo/goutils/websocket"
 	"github.com/Sherlock-Holo/libsocks"
 	"github.com/Sherlock-Holo/link"
@@ -19,17 +20,24 @@ import (
 )
 
 type Server struct {
-	config   server.Server
+	Addr     string
+	Services []*server.Service
 	upgrader websocket.Upgrader
 }
 
-func (s *Server) serviceProxy(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("token") != s.config.Token || !websocket.IsWebSocketUpgrade(r) {
-		s.serviceInvalid(w, r)
+type camouflageService struct {
+	Token    string
+	WebRoot  string
+	upgrader websocket.Upgrader
+}
+
+func (cs *camouflageService) serviceProxy(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("token") != cs.Token || !websocket.IsWebSocketUpgrade(r) {
+		cs.serviceInvalid(w, r)
 		return
 	}
 
-	conn, err := s.upgrader.Upgrade(w, r, nil)
+	conn, err := cs.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		conn.Close()
@@ -46,21 +54,21 @@ func (s *Server) serviceProxy(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		go handle(s, l)
+		go handle(l)
 	}
 }
 
-func (s *Server) serviceInvalid(w http.ResponseWriter, r *http.Request) {
+func (cs *camouflageService) serviceInvalid(w http.ResponseWriter, r *http.Request) {
 	log.Println("an invalid request is detected from", r.RemoteAddr)
-	if s.config.WebPage != "" {
-		http.ServeFile(w, r, filepath.Join(s.config.WebPage, r.URL.Path))
+	if cs.WebRoot != "" {
+		http.ServeFile(w, r, filepath.Join(cs.WebRoot, r.URL.Path))
 	} else {
 		http.NotFound(w, r)
 	}
 	return
 }
 
-func handle(handler *Server, l *link.Link) {
+func handle(l *link.Link) {
 	address, err := libsocks.DecodeFrom(l)
 	if err != nil {
 		log.Println(err)
@@ -68,42 +76,40 @@ func handle(handler *Server, l *link.Link) {
 		return
 	}
 
-	if handler.config.DNS != "" {
-		if address.Type == 3 {
-			if addrs, err := dns.Resolver.LookupIPAddr(context.Background(), address.Host); err == nil {
-				if dns.HasPublicIPv6() {
-					ip := addrs[rand.Intn(len(addrs))].IP
-					if ip.To4() != nil {
-						address.Type = 1
-						address.IP = ip.To4()
-					} else {
-						address.Type = 4
-						address.IP = ip
-					}
-
-				} else {
-					var v4s []net.IP
-					for _, ip := range addrs {
-						if v4 := ip.IP.To4(); v4 != nil {
-							v4s = append(v4s, v4)
-						}
-					}
-
-					if v4s == nil {
-						log.Println("interfaces only have IPv4 address but DNS resolve result doesn't have IPv4")
-						l.Close()
-						return
-					}
-
-					ip := v4s[rand.Intn(len(v4s))]
+	switch address.Type {
+	case 3:
+		if addrs, err := net.DefaultResolver.LookupIPAddr(context.Background(), address.Host); err == nil {
+			if nic.HasPublicIPv6() {
+				ip := addrs[rand.Intn(len(addrs))].IP
+				if ipv4 := ip.To4(); ipv4 != nil {
 					address.Type = 1
+					address.IP = ipv4
+				} else {
+					address.Type = 4
 					address.IP = ip
 				}
 			} else {
-				log.Println("resolve DNS", err)
-				l.Close()
-				return
+				var ipv4s []net.IP
+				for _, ip := range addrs {
+					if ipv4 := ip.IP.To4(); ipv4 != nil {
+						ipv4s = append(ipv4s, ipv4)
+					}
+				}
+
+				if ipv4s == nil {
+					log.Println("interfaces only have IPv4 address but DNS resolve result doesn't have IPv4")
+					l.Close()
+					return
+				}
+
+				ip := ipv4s[rand.Intn(len(ipv4s))]
+				address.Type = 1
+				address.IP = ip
 			}
+		} else {
+			log.Println("resolve DNS", err)
+			l.Close()
+			return
 		}
 	}
 
@@ -131,31 +137,86 @@ func handle(handler *Server, l *link.Link) {
 	}()
 }
 
-func (s *Server) Run() {
-	mux := http.NewServeMux()
+func (s *Server) Run() *http.Server {
+	tlsConfig := new(tls.Config)
 
-	mux.HandleFunc(s.config.Path, s.serviceProxy)
-	mux.HandleFunc("/", s.serviceInvalid)
-
-	log.Println(http.ListenAndServeTLS(
-		net.JoinHostPort(s.config.ListenAddr, strconv.Itoa(s.config.ListenPort)),
-		s.config.Crt,
-		s.config.Key,
-		mux,
-	),
-	)
-}
-
-func New(cfg *server.Server) (*Server, error) {
-	s := &Server{
-		config: *cfg,
+	for _, service := range s.Services {
+		crtBytes, err := ioutil.ReadFile(service.Crt)
+		if err != nil {
+			log.Fatalf("service name: %s, read crt file error: %s", service.ServiceName, err)
+		}
+		keyBytes, err := ioutil.ReadFile(service.Key)
+		if err != nil {
+			log.Fatalf("service name: %s, read private key file error: %s", service.ServiceName, err)
+		}
+		certificate, err := tls.X509KeyPair(crtBytes, keyBytes)
+		if err != nil {
+			log.Fatalf("service name: %s, X509 key pair error: %s", service.ServiceName, err)
+		}
+		tlsConfig.Certificates = append(tlsConfig.Certificates, certificate)
 	}
 
+	tlsConfig.NextProtos = append(tlsConfig.NextProtos, "h2")
+
+	tcpListener, err := net.Listen("tcp", s.Addr)
+	if err != nil {
+		log.Fatalf("addr: %s, tcp listen error: %s", s.Addr, err)
+	}
+
+	tlsListener := tls.NewListener(tcpListener, tlsConfig)
+
+	mux := http.NewServeMux()
+
+	for _, service := range s.Services {
+		cs := camouflageService{}
+
+		switch service.Type {
+		case "camouflage":
+			cs.Token = service.Token
+			host := service.Host
+			mux.HandleFunc(host+service.Path, cs.serviceProxy)
+
+			if service.WebRoot != "" {
+				cs.WebRoot = service.WebRoot
+				mux.HandleFunc(host+"/", cs.serviceInvalid)
+			}
+
+		case "web":
+			if service.WebRoot != "" {
+				cs.WebRoot = service.WebRoot
+				mux.HandleFunc(service.Host+"/", cs.serviceInvalid)
+			}
+		}
+
+		log.Println(service.Type, "service", service.ServiceName, "inited")
+	}
+
+	httpServer := &http.Server{Handler: mux}
+
+	go func() {
+		if err := httpServer.Serve(tlsListener); err != http.ErrServerClosed {
+			log.Println(err)
+		}
+	}()
+
+	return httpServer
+}
+
+func New(cfg *server.Config) (servers []*Server) {
 	if cfg.DNS != "" {
-		dns.Resolver.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
+		net.DefaultResolver.PreferGo = true
+		net.DefaultResolver.Dial = func(_ context.Context, _, _ string) (net.Conn, error) {
 			return net.Dial(cfg.DNSType, cfg.DNS)
 		}
 	}
 
-	return s, nil
+	for addr, services := range cfg.Services {
+		s := new(Server)
+		s.Addr = addr
+		s.Services = services
+
+		servers = append(servers, s)
+	}
+
+	return
 }
