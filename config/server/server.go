@@ -1,28 +1,40 @@
 package server
 
 import (
+	"net"
 	"path/filepath"
+	"strconv"
 
 	"github.com/pelletier/go-toml"
 )
 
-type Server struct {
-	ListenAddr string `toml:"listen_addr"`
-	ListenPort int    `toml:"listen_port"`
-	Path       string `toml:"path"`
-
-	Token string
-
-	Crt string `toml:"crt"`
-	Key string `toml:"key"`
-
+type Config struct {
 	DNS     string `toml:"dns"`
 	DNSType string `toml:"dns_type"`
 
-	WebPage string `toml:"web_page"`
+	Services map[string][]*Service `toml:"ignore"`
 }
 
-func New(path string) (*Server, error) {
+type Service struct {
+	ServiceName string `toml:"ignore"`
+
+	ListenAddr string `toml:"listen_addr"`
+	ListenPort int    `toml:"listen_port"`
+
+	Type string
+
+	Token string
+	Path  string
+
+	WebRoot string `toml:"web_root"`
+
+	Host string
+
+	Crt string
+	Key string
+}
+
+func New(path string) (*Config, error) {
 	tree, err := toml.LoadFile(path)
 	if err != nil {
 		return nil, err
@@ -30,27 +42,40 @@ func New(path string) (*Server, error) {
 
 	serverTree := tree.Get("server").(*toml.Tree)
 
-	server := new(Server)
-	if err = serverTree.Unmarshal(server); err != nil {
+	config := new(Config)
+	if err = serverTree.Unmarshal(config); err != nil {
 		return nil, err
 	}
 
-	// read token
-	server.Token = tree.Get("token").(string)
-
-	if !filepath.IsAbs(server.Crt) {
-		server.Crt = filepath.Join(filepath.Dir(path), server.Crt)
-	}
-
-	if !filepath.IsAbs(server.Key) {
-		server.Key = filepath.Join(filepath.Dir(path), server.Key)
-	}
-
-	if server.WebPage != "" {
-		if !filepath.IsAbs(server.WebPage) {
-			server.WebPage = filepath.Join(filepath.Dir(path), server.WebPage)
+	for name, s := range serverTree.ToMap() {
+		switch value := s.(type) {
+		case map[string]interface{}:
+			serviceTree, err := toml.TreeFromMap(value)
+			if err != nil {
+				return nil, err
+			}
+			service := new(Service)
+			if err := serviceTree.Unmarshal(service); err != nil {
+				return nil, err
+			}
+			service.ServiceName = name
+			addr := net.JoinHostPort(service.ListenAddr, strconv.Itoa(service.ListenPort))
+			config.Services[addr] = append(config.Services[addr], service)
 		}
 	}
 
-	return server, nil
+	for _, services := range config.Services {
+		for i := range services {
+			if !filepath.IsAbs(services[i].Crt) {
+				services[i].Crt = filepath.Join(filepath.Dir(path), services[i].Crt)
+				services[i].Key = filepath.Join(filepath.Dir(path), services[i].Key)
+
+				if services[i].WebRoot != "" && !filepath.IsAbs(services[i].WebRoot) {
+					services[i].WebRoot = filepath.Join(filepath.Dir(path), services[i].WebRoot)
+				}
+			}
+		}
+	}
+
+	return config, nil
 }

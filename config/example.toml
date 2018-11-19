@@ -28,14 +28,49 @@ self_ca = "../script/ca/ca.crt"
 
 
 [server]
+dns_type = "udp"
+dns = "119.29.29.29:53"
+
+
+[server.camouflage]
+type = "camouflage"
+
+host = "camouflage.example.com"
+
 listen_addr = "127.0.0.1"
 listen_port = 9876
-path = "/websocket"
 
 crt = "../script/server/server.crt"
 key = "../script/server/server.key"
 
-dns_type = "udp"
-dns = "119.29.29.29:53"
+token = "HmKThr6ZQUeIXl12CVTXnOLJ0bA0ow-BqLOWjwYDhNs"
+path = "/websocket"
 
-web_page = ""
+web_root = "test"
+
+[server.web]
+type = "web"
+
+host = "www.example.com"
+
+listen_addr = "127.0.0.1"
+listen_port = 9876
+
+crt = "../script/server/server.crt"
+key = "../script/server/server.key"
+
+web_root = "test2"
+
+
+[server.web2]
+type = "web"
+
+host = "test.example.com"
+
+listen_addr = "127.0.0.1"
+listen_port = 9875
+
+crt = "../script/server/server.crt"
+key = "../script/server/server.key"
+
+web_root = ""
