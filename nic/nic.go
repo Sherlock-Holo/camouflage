@@ -1,14 +1,10 @@
-package dns
+package nic
 
 import (
 	"net"
 
 	net2 "github.com/Sherlock-Holo/goutils/net"
 )
-
-var Resolver = net.Resolver{
-	PreferGo: true,
-}
 
 func HasPublicIPv6() bool {
 	addrs, _ := net.InterfaceAddrs()
