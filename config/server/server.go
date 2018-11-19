@@ -46,6 +46,7 @@ func New(path string) (*Config, error) {
 	if err = serverTree.Unmarshal(config); err != nil {
 		return nil, err
 	}
+	config.Services = make(map[string][]*Service)
 
 	for name, s := range serverTree.ToMap() {
 		switch value := s.(type) {
