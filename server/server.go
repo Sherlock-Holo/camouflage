@@ -60,12 +60,11 @@ func (cs *camouflageService) serviceProxy(w http.ResponseWriter, r *http.Request
 
 func (cs *camouflageService) serviceInvalid(w http.ResponseWriter, r *http.Request) {
 	log.Println("an invalid request is detected from", r.RemoteAddr)
-	if cs.WebRoot != "" {
-		http.ServeFile(w, r, filepath.Join(cs.WebRoot, r.URL.Path))
-	} else {
-		http.NotFound(w, r)
-	}
-	return
+	cs.serviceWeb(w, r)
+}
+
+func (cs *camouflageService) serviceWeb(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, filepath.Join(cs.WebRoot, r.URL.Path))
 }
 
 func handle(l *link.Link) {
@@ -184,7 +183,7 @@ func (s *Server) Run() *http.Server {
 		case "web":
 			if service.WebRoot != "" {
 				cs.WebRoot = service.WebRoot
-				mux.HandleFunc(service.Host+"/", cs.serviceInvalid)
+				mux.HandleFunc(service.Host+"/", cs.serviceWeb)
 			}
 		}
 
