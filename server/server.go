@@ -19,20 +19,23 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+var dialer = net.Dialer{}
+
 type Server struct {
-	Addr     string
-	Services []*server.Service
-	upgrader websocket.Upgrader
+	noTLS    bool
+	addr     string
+	services []*server.Service
 }
 
 type camouflageService struct {
-	Token    string
-	WebRoot  string
-	upgrader websocket.Upgrader
+	token             string
+	webRoot           string
+	upgrader          websocket.Upgrader
+	disableInvalidLog bool
 }
 
 func (cs *camouflageService) serviceProxy(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("token") != cs.Token || !websocket.IsWebSocketUpgrade(r) {
+	if r.Header.Get("token") != cs.token || !websocket.IsWebSocketUpgrade(r) {
 		cs.serviceInvalid(w, r)
 		return
 	}
@@ -64,7 +67,7 @@ func (cs *camouflageService) serviceInvalid(w http.ResponseWriter, r *http.Reque
 }
 
 func (cs *camouflageService) serviceWeb(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, filepath.Join(cs.WebRoot, r.URL.Path))
+	http.ServeFile(w, r, filepath.Join(cs.webRoot, r.URL.Path))
 }
 
 func handle(l *link.Link) {
@@ -137,9 +140,17 @@ func handle(l *link.Link) {
 }
 
 func (s *Server) Run() *http.Server {
+	if s.noTLS {
+		return s.noTLSRun()
+	}
+
+	return s.tlsRun()
+}
+
+func (s *Server) tlsRun() *http.Server {
 	tlsConfig := new(tls.Config)
 
-	for _, service := range s.Services {
+	for _, service := range s.services {
 		crtBytes, err := ioutil.ReadFile(service.Crt)
 		if err != nil {
 			log.Fatalf("service name: %s, read crt file error: %s", service.ServiceName, err)
@@ -157,37 +168,32 @@ func (s *Server) Run() *http.Server {
 
 	tlsConfig.NextProtos = append(tlsConfig.NextProtos, "h2")
 
-	tcpListener, err := net.Listen("tcp", s.Addr)
+	tcpListener, err := net.Listen("tcp", s.addr)
 	if err != nil {
-		log.Fatalf("addr: %s, tcp listen error: %s", s.Addr, err)
+		log.Fatalf("addr: %s, tcp listen error: %s", s.addr, err)
 	}
 
 	tlsListener := tls.NewListener(tcpListener, tlsConfig)
 
 	mux := http.NewServeMux()
 
-	for _, service := range s.Services {
+	for _, service := range s.services {
 		cs := camouflageService{}
 
-		switch service.Type {
-		case "camouflage":
-			cs.Token = service.Token
-			host := service.Host
-			mux.HandleFunc(host+service.Path, cs.serviceProxy)
+		cs.token = service.Token
+		host := service.Host
+		mux.HandleFunc(host+service.Path, cs.serviceProxy)
 
-			if service.WebRoot != "" {
-				cs.WebRoot = service.WebRoot
+		if service.WebRoot != "" {
+			cs.webRoot = service.WebRoot
+			if !service.DisableInvalidLog {
 				mux.HandleFunc(host+"/", cs.serviceInvalid)
-			}
-
-		case "web":
-			if service.WebRoot != "" {
-				cs.WebRoot = service.WebRoot
-				mux.HandleFunc(service.Host+"/", cs.serviceWeb)
+			} else {
+				mux.HandleFunc(host+"/", cs.serviceWeb)
 			}
 		}
 
-		log.Println(service.Type, "service", service.ServiceName, "inited")
+		log.Println("service", service.ServiceName, "inited")
 	}
 
 	httpServer := &http.Server{Handler: mux}
@@ -201,18 +207,64 @@ func (s *Server) Run() *http.Server {
 	return httpServer
 }
 
+func (s *Server) noTLSRun() *http.Server {
+	tcpListener, err := net.Listen("tcp", s.addr)
+	if err != nil {
+		log.Fatalf("addr: %s, tcp listen error: %s", s.addr, err)
+	}
+	mux := http.NewServeMux()
+
+	for _, service := range s.services {
+		cs := camouflageService{}
+
+		cs.token = service.Token
+		host := service.Host
+		mux.HandleFunc(host+service.Path, cs.serviceProxy)
+
+		if service.WebRoot != "" {
+			cs.webRoot = service.WebRoot
+			if !service.DisableInvalidLog {
+				mux.HandleFunc(host+"/", cs.serviceInvalid)
+			} else {
+				mux.HandleFunc(host+"/", cs.serviceWeb)
+			}
+		}
+
+		log.Println("service", service.ServiceName, "inited")
+	}
+
+	httpServer := &http.Server{Handler: mux}
+
+	go func() {
+		if err := httpServer.Serve(tcpListener); err != http.ErrServerClosed {
+			log.Println(err)
+		}
+	}()
+
+	return httpServer
+}
+
 func New(cfg *server.Config) (servers []*Server) {
+	net.DefaultResolver.PreferGo = true
 	if cfg.DNS != "" {
-		net.DefaultResolver.PreferGo = true
-		net.DefaultResolver.Dial = func(_ context.Context, _, _ string) (net.Conn, error) {
-			return net.Dial(cfg.DNSType, cfg.DNS)
+		net.DefaultResolver.Dial = func(ctx context.Context, _, _ string) (net.Conn, error) {
+			return dialer.DialContext(ctx, cfg.DNSType, cfg.DNS)
 		}
 	}
 
-	for addr, services := range cfg.Services {
+	for addr, services := range cfg.TLSServices {
 		s := new(Server)
-		s.Addr = addr
-		s.Services = services
+		s.addr = addr
+		s.services = services
+
+		servers = append(servers, s)
+	}
+
+	for addr, services := range cfg.NoTLSServices {
+		s := new(Server)
+		s.noTLS = true
+		s.addr = addr
+		s.services = services
 
 		servers = append(servers, s)
 	}
