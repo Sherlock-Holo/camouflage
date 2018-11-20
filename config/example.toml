@@ -2,7 +2,7 @@
 token = "HmKThr6ZQUeIXl12CVTXnOLJ0bA0ow-BqLOWjwYDhNs"
 
 [client]
-remote_addr = "127.0.0.1"
+remote_addr = "camouflage.example.com"
 remote_port = 9876
 path = "/websocket"
 
@@ -69,7 +69,7 @@ web_root = "/home/sherlock/git/blog/output"
 
 [server.camouflage-notls]
 listen_addr = "127.0.0.1"
-listen_port = 9877
+listen_port = 9878
 
 disable_invalid_request_log = true
 
