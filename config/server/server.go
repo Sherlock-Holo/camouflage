@@ -78,24 +78,21 @@ func New(path string) (*Config, error) {
 		for i := range services {
 			if !filepath.IsAbs(services[i].Crt) {
 				services[i].Crt = filepath.Join(filepath.Dir(path), services[i].Crt)
+			}
+			if !filepath.IsAbs(services[i].Key) {
 				services[i].Key = filepath.Join(filepath.Dir(path), services[i].Key)
+			}
 
-				if services[i].WebRoot != "" && !filepath.IsAbs(services[i].WebRoot) {
-					services[i].WebRoot = filepath.Join(filepath.Dir(path), services[i].WebRoot)
-				}
+			if services[i].WebRoot != "" && !filepath.IsAbs(services[i].WebRoot) {
+				services[i].WebRoot = filepath.Join(filepath.Dir(path), services[i].WebRoot)
 			}
 		}
 	}
 
 	for _, services := range config.NoTLSServices {
 		for i := range services {
-			if !filepath.IsAbs(services[i].Crt) {
-				services[i].Crt = filepath.Join(filepath.Dir(path), services[i].Crt)
-				services[i].Key = filepath.Join(filepath.Dir(path), services[i].Key)
-
-				if services[i].WebRoot != "" && !filepath.IsAbs(services[i].WebRoot) {
-					services[i].WebRoot = filepath.Join(filepath.Dir(path), services[i].WebRoot)
-				}
+			if services[i].WebRoot != "" && !filepath.IsAbs(services[i].WebRoot) {
+				services[i].WebRoot = filepath.Join(filepath.Dir(path), services[i].WebRoot)
 			}
 		}
 	}
