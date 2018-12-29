@@ -25,6 +25,6 @@ type Frontend interface {
 }
 
 var Frontends = map[Type]func(conn net.Conn, key []byte) (Frontend, error){
-	SOCKS: NewSocks,
+	SOCKS:                     NewSocks,
 	SHADOWSOCKS_CHACHA20_IETF: NewShadowsocks,
 }
