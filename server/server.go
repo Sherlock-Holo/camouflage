@@ -149,6 +149,8 @@ func (s *Server) Run() *http.Server {
 
 func (s *Server) tlsRun() *http.Server {
 	tlsConfig := new(tls.Config)
+	tlsConfig.PreferServerCipherSuites = true
+	tlsConfig.NextProtos = append(tlsConfig.NextProtos, "h2")
 
 	for _, service := range s.services {
 		crtBytes, err := ioutil.ReadFile(service.Crt)
@@ -165,8 +167,6 @@ func (s *Server) tlsRun() *http.Server {
 		}
 		tlsConfig.Certificates = append(tlsConfig.Certificates, certificate)
 	}
-
-	tlsConfig.NextProtos = append(tlsConfig.NextProtos, "h2")
 
 	tcpListener, err := net.Listen("tcp", s.addr)
 	if err != nil {
