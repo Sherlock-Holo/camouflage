@@ -19,5 +19,6 @@ var serverCmd = &cobra.Command{
 		}
 		server := server.New(&cfg)
 		server.Run()
+		<-make(chan struct{})
 	},
 }
