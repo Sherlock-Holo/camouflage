@@ -3,10 +3,10 @@ Description=Camouflage client service
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/camouflage -client /etc/camouflage/%i.toml
+ExecStart=/usr/bin/camouflage client /etc/camouflage/%i.toml
 MemoryAccounting=true
 Restart=on-failure
-RestartSec=30
+RestartSec=3
 
 [Install]
 WantedBy=multi-user.target

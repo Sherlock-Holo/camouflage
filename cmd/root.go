@@ -7,11 +7,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const version = "0.6.0"
+const version = "0.6.1"
 
 var rootCmd = &cobra.Command{
 	Use:     "camouflage",
-	Short:   "camouflage is a websocket over TLS proxy",
+	Short:   "camouflage is a mux websocket over TLS proxy",
 	Version: version,
 }
 
