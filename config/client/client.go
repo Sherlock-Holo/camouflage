@@ -1,92 +1,27 @@
 package client
 
 import (
-	"github.com/Sherlock-Holo/camouflage/frontend"
-	"github.com/pelletier/go-toml"
-	"path/filepath"
+	"github.com/BurntSushi/toml"
+	"github.com/pkg/errors"
 )
 
-type Client struct {
+type Config struct {
 	RemoteAddr string `toml:"remote_addr"`
-	RemotePort int    `toml:"remote_port"`
 	Path       string `toml:"path"`
-
-	MaxLinks int `toml:"max_links"`
-
-	Token string
-
-	SelfCA string `toml:"self_ca"`
-
-	MonitorAddr string `toml:"monitor_addr"`
-	MonitorPort int    `toml:"monitor_port"`
-
-	Shadowsocks []Shadowsocks `toml:"ignore"`
-	Socks       []Socks       `toml:"ignore"`
+	Key        string `toml:"key"`
+	Crt        string `toml:"crt"`
+	ListenAddr string `toml:"listen_addr"`
 }
 
-func New(path string) (*Client, error) {
-	tree, err := toml.LoadFile(path)
-	if err != nil {
-		return nil, err
+type tomlConfig struct {
+	Client Config `toml:"client"`
+}
+
+func New(path string) (Config, error) {
+	config := new(tomlConfig)
+	if _, err := toml.DecodeFile(path, config); err != nil {
+		return Config{}, errors.WithStack(err)
 	}
 
-	clientTree := tree.Get("client").(*toml.Tree)
-	client := new(Client)
-
-	if err = clientTree.Unmarshal(client); err != nil {
-		return nil, err
-	}
-
-	// read token
-	client.Token = tree.Get("token").(string)
-
-	// read SelfCA
-	if client.SelfCA != "" {
-		if !filepath.IsAbs(client.SelfCA) {
-			client.SelfCA = filepath.Join(filepath.Dir(path), client.SelfCA)
-		}
-	}
-
-	clientMap := clientTree.ToMap()
-	treeMap := make(map[frontend.Type][]*toml.Tree)
-
-	for _, v := range clientMap {
-		switch m := v.(type) {
-		case map[string]interface{}:
-			littleTree, err := toml.TreeFromMap(m)
-			if err != nil {
-				return nil, err
-			}
-
-			switch littleTree.Get("type").(string) {
-			case "socks":
-				treeMap[frontend.SOCKS] = append(treeMap[frontend.SOCKS], littleTree)
-
-			case "ss":
-				treeMap[frontend.SHADOWSOCKS_CHACHA20_IETF] = append(treeMap[frontend.SHADOWSOCKS_CHACHA20_IETF], littleTree)
-			}
-		}
-	}
-
-	socksTrees := treeMap[frontend.SOCKS]
-	for _, socksTree := range socksTrees {
-		socks := new(Socks)
-		if err = socksTree.Unmarshal(socks); err != nil {
-			return nil, err
-		}
-
-		client.Socks = append(client.Socks, *socks)
-	}
-
-	ssTrees := treeMap[frontend.SHADOWSOCKS_CHACHA20_IETF]
-	for _, ssTree := range ssTrees {
-		ss := new(Shadowsocks)
-		if err = ssTree.Unmarshal(ss); err != nil {
-			return nil, err
-		}
-
-		client.Shadowsocks = append(client.Shadowsocks, *ss)
-	}
-
-	return client, nil
+	return config.Client, nil
 }

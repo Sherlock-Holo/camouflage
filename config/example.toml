@@ -1,81 +1,24 @@
-# new auth type
-token = "HmKThr6ZQUeIXl12CVTXnOLJ0bA0ow-BqLOWjwYDhNs"
-
 [client]
-remote_addr = "camouflage.example.com"
-remote_port = 9876
+remote_addr = "camouflage.example.com:9876"
 path = "/websocket"
 
-max_links = 100
+key = "client.key"
+crt = "client.cert"
 
-# if use self-signed certificate, un-comment to import self CA
-self_ca = "../script/ca/ca.crt"
-
-# un-comment to enable monitor
-#monitor_addr = "127.0.0.1"
-#monitor_port = 19998
-
-    [client.ss]
-    type = "ss"
-    listen_addr = "127.0.0.1"
-    listen_port = 9877
-    key = "holo"
-
-    [client.socks]
-    type = "socks"
-    listen_addr = "127.0.0.1"
-    listen_port = 9875
+listen_addr = "127.0.0.1:9875"
 
 
 [server]
-dns_type = "udp"
-dns = "119.29.29.29:53"
+host = "camouflage.example.com:9876"
 
+listen_addr = "127.0.0.1:9876"
 
-[server.camouflage]
-host = "camouflage.example.com"
+client_ca_key = "../script/ca/ca.key"
+client_ca_crt = "../script/ca/ca.crt"
 
-listen_addr = "127.0.0.1"
-listen_port = 9876
-
-# disable invalid reqeust log if you don't like this log, default is false
-#disable_invalid_request_log = true
-
-crt = "../script/server/server.crt"
 key = "../script/server/server.key"
-
-token = "HmKThr6ZQUeIXl12CVTXnOLJ0bA0ow-BqLOWjwYDhNs"
-path = "/websocket"
-
-web_root = "/home/sherlock/git/blog/output"
-
-
-[server.camouflage2]
-host = "camouflage2.example.com"
-
-listen_addr = "127.0.0.1"
-listen_port = 9876
-
-disable_invalid_request_log = true
-
 crt = "../script/server/server.crt"
-key = "../script/server/server.key"
 
-token = "HmKThr6ZQUeIXl12CVTXnOLJ0bA0ow-BqLOWjwYDhNs"
-path = "/websocket"
-
-web_root = "/home/sherlock/git/blog/output"
-
-
-[server.camouflage-notls]
-listen_addr = "127.0.0.1"
-listen_port = 9878
-
-disable_invalid_request_log = true
-
-no_tls = true
-
-token = "HmKThr6ZQUeIXl12CVTXnOLJ0bA0ow-BqLOWjwYDhNs"
 path = "/websocket"
 
 web_root = "/home/sherlock/git/blog/output"
