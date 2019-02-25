@@ -1,10 +1,10 @@
-package frontend
+package client
 
 import (
-	"fmt"
 	"net"
 
 	"github.com/Sherlock-Holo/libsocks"
+	"github.com/pkg/errors"
 )
 
 type Socks struct {
@@ -12,10 +12,10 @@ type Socks struct {
 	target []byte
 }
 
-func NewSocks(conn net.Conn, _ []byte) (socks Frontend, err error) {
+func NewSocks(conn net.Conn) (socks *Socks, err error) {
 	s, err := libsocks.NewSocks(conn, nil)
 	if err != nil {
-		err = fmt.Errorf("new socks: %s", err)
+		err = errors.Wrap(err, "new socks failed")
 		conn.Close()
 		return
 	}
@@ -25,18 +25,15 @@ func NewSocks(conn net.Conn, _ []byte) (socks Frontend, err error) {
 	}, nil
 }
 
-func (s *Socks) Handshake(b bool) error {
-	if b {
-		return s.socks.Reply(s.socks.LocalAddr().(*net.TCPAddr).IP, uint16(s.socks.LocalAddr().(*net.TCPAddr).Port), libsocks.Success)
+func (s *Socks) Handshake(ok bool) error {
+	if ok {
+		return errors.WithStack(s.socks.Reply(s.socks.LocalAddr().(*net.TCPAddr).IP, uint16(s.socks.LocalAddr().(*net.TCPAddr).Port), libsocks.Success))
 	} else {
-		return s.socks.Reply(s.socks.LocalAddr().(*net.TCPAddr).IP, uint16(s.socks.LocalAddr().(*net.TCPAddr).Port), libsocks.ServerFailed)
+		return errors.WithStack(s.socks.Reply(s.socks.LocalAddr().(*net.TCPAddr).IP, uint16(s.socks.LocalAddr().(*net.TCPAddr).Port), libsocks.ServerFailed))
 	}
 }
 
 func (s *Socks) Target() []byte {
-	if s.target == nil {
-
-	}
 	return s.socks.Target.Bytes()
 }
 
