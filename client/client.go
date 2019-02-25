@@ -48,10 +48,8 @@ func New(cfg *client.Config) (*Client, error) {
 	}
 
 	if cfg.DebugCA != "" {
-		certPool, err := x509.SystemCertPool()
-		if err != nil {
-			log.Fatalf("get system ca pool failed: %+v", errors.WithStack(err))
-		}
+		certPool := x509.NewCertPool()
+
 		caBytes, err := ioutil.ReadFile(cfg.DebugCA)
 		if err != nil {
 			log.Fatalf("read ca cert failed: %+v", errors.WithStack(err))
@@ -95,6 +93,10 @@ func (c *Client) Run() {
 }
 
 func (c *Client) reconnect() error {
+	if c.manager != nil {
+		c.manager.Close()
+	}
+
 	conn, _, err := c.wsDialer.Dial(c.wsURL, nil)
 	if err != nil {
 		return errors.WithStack(err)
@@ -120,6 +122,7 @@ func (c *Client) handle(conn net.Conn) {
 			if err := c.reconnect(); err != nil {
 				log.Printf("reconnect failed: %v", err)
 				c.managerLock.Unlock()
+				socks.Close()
 				return
 			}
 
@@ -127,6 +130,7 @@ func (c *Client) handle(conn net.Conn) {
 			if err != nil {
 				log.Printf("dial failed: %v", errors.WithStack(err))
 				c.managerLock.Unlock()
+				socks.Close()
 				return
 			}
 			c.managerLock.Unlock()
@@ -135,6 +139,7 @@ func (c *Client) handle(conn net.Conn) {
 			if err != nil {
 				log.Printf("dial failed: %v", errors.WithStack(err))
 				c.managerLock.Unlock()
+				socks.Close()
 				return
 			}
 			c.managerLock.Unlock()
@@ -145,6 +150,7 @@ func (c *Client) handle(conn net.Conn) {
 		if err != nil {
 			log.Printf("dial failed: %v", errors.WithStack(err))
 			c.managerLock.RUnlock()
+			socks.Close()
 			return
 		}
 		c.managerLock.RUnlock()
@@ -160,7 +166,6 @@ func (c *Client) handle(conn net.Conn) {
 
 	if err := socks.Handshake(true); err != nil {
 		log.Printf("handshake failed: %v", err)
-
 		socks.Close()
 		l.Close()
 		return
@@ -181,5 +186,4 @@ func (c *Client) handle(conn net.Conn) {
 		socks.Close()
 		l.Close()
 	}()
-	return
 }

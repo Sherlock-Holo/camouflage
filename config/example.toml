@@ -3,7 +3,7 @@ remote_addr = "camouflage.example.com:9876"
 path = "/websocket"
 
 key = "script/client/client.key"
-crt = "script/client/client.cert"
+crt = "script/client/client.crt"
 
 # set a ca to debug camouflage, non-recommand use in product server
 debug_ca = "script/ca/ca.crt"
@@ -16,8 +16,8 @@ host = "camouflage.example.com:9876"
 
 listen_addr = "127.0.0.1:9876"
 
-client_ca_key = "../script/ca/ca.key"
-client_ca_crt = "../script/ca/ca.crt"
+client_ca_key = "script/ca/ca.key"
+client_ca_crt = "script/ca/ca.crt"
 
 key = "script/server/server.key"
 crt = "script/server/server.crt"
