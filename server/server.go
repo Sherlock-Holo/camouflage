@@ -35,7 +35,7 @@ func (s *Server) checkRequest(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("websocket upgrade failed: %s", err)
+		log.Printf("websocket upgrade failed: %s", errors.WithStack(err))
 		return
 	}
 
@@ -59,21 +59,21 @@ func (s *Server) webHandle(w http.ResponseWriter, r *http.Request) {
 func handle(l *link.Link) {
 	address, err := libsocks.DecodeFrom(l)
 	if err != nil {
-		log.Println(err)
+		log.Printf("decode socks failed: %+v", errors.WithStack(err))
 		l.Close()
 		return
 	}
 
 	remote, err := net.Dial("tcp", address.String())
 	if err != nil {
-		log.Println(err)
+		log.Printf("connect target failed: %+v", errors.WithStack(err))
 		l.Close()
 		return
 	}
 
 	go func() {
 		if _, err := io.Copy(remote, l); err != nil {
-			log.Println(err)
+			log.Printf("%v", err)
 		}
 		l.Close()
 		remote.Close()
@@ -81,7 +81,7 @@ func handle(l *link.Link) {
 
 	go func() {
 		if _, err := io.Copy(l, remote); err != nil {
-			log.Println(err)
+			log.Printf("%v", err)
 		}
 		l.Close()
 		remote.Close()
@@ -111,6 +111,7 @@ func (s *Server) Run() *http.Server {
 
 	tlsConfig.Certificates = append(tlsConfig.Certificates, serverCertificate)
 
+	// set client auth mode, use tls.VerifyClientCertIfGiven
 	tlsConfig.ClientAuth = tls.VerifyClientCertIfGiven
 
 	tcpListener, err := net.Listen("tcp", s.config.ListenAddr)
