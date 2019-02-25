@@ -1,13 +1,13 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
+	"log"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
-const version = "0.3.0"
+const version = "0.6.0"
 
 var rootCmd = &cobra.Command{
 	Use:     "camouflage",
@@ -21,7 +21,6 @@ func Execute() {
 	rootCmd.InitDefaultVersionFlag()
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatalf("%v", errors.WithStack(err))
 	}
 }
