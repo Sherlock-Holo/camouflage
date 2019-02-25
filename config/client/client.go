@@ -10,6 +10,7 @@ type Config struct {
 	Path       string `toml:"path"`
 	Key        string `toml:"key"`
 	Crt        string `toml:"crt"`
+	DebugCA    string `toml:"debug_ca"`
 	ListenAddr string `toml:"listen_addr"`
 }
 

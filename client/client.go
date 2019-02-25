@@ -2,7 +2,9 @@ package client
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/url"
@@ -41,10 +43,27 @@ func New(cfg *client.Config) (*Client, error) {
 		log.Fatalf("read key pair failed: %+v", errors.WithStack(err))
 	}
 
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{certificate},
+	}
+
+	if cfg.DebugCA != "" {
+		certPool, err := x509.SystemCertPool()
+		if err != nil {
+			log.Fatalf("get system ca pool failed: %+v", errors.WithStack(err))
+		}
+		caBytes, err := ioutil.ReadFile(cfg.DebugCA)
+		if err != nil {
+			log.Fatalf("read ca cert failed: %+v", errors.WithStack(err))
+		}
+
+		certPool.AppendCertsFromPEM(caBytes)
+
+		tlsConfig.RootCAs = certPool
+	}
+
 	dialer := websocket.Dialer{
-		TLSClientConfig: &tls.Config{
-			Certificates: []tls.Certificate{certificate},
-		},
+		TLSClientConfig: tlsConfig,
 	}
 
 	return &Client{
@@ -57,7 +76,7 @@ func New(cfg *client.Config) (*Client, error) {
 
 func (c *Client) Run() {
 	for {
-		if err := c.Reconnect(); err != nil {
+		if err := c.reconnect(); err != nil {
 			log.Printf("connect to server failed: %v", errors.WithStack(err))
 			continue
 		}
@@ -75,7 +94,7 @@ func (c *Client) Run() {
 	}
 }
 
-func (c *Client) Reconnect() error {
+func (c *Client) reconnect() error {
 	conn, _, err := c.wsDialer.Dial(c.wsURL, nil)
 	if err != nil {
 		return errors.WithStack(err)
@@ -98,7 +117,7 @@ func (c *Client) handle(conn net.Conn) {
 
 		c.managerLock.Lock()
 		if c.manager.IsClosed() {
-			if err := c.Reconnect(); err != nil {
+			if err := c.reconnect(); err != nil {
 				log.Printf("reconnect failed: %v", err)
 				c.managerLock.Unlock()
 				return
