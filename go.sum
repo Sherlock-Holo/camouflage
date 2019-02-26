@@ -2,8 +2,8 @@ github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/Sherlock-Holo/goutils v0.0.0-20180828013039-2447c3761d0f h1:1iThzSags3+tEJly03ufRdIJKXDmsWJGC2G0j75Z+dI=
 github.com/Sherlock-Holo/goutils v0.0.0-20180828013039-2447c3761d0f/go.mod h1:XIQ0d16kdYVZLHtOrtDlgcYFDy337n4cmcfYTPIMrK4=
-github.com/Sherlock-Holo/libsocks v0.0.0-20180626024653-c6b26d141c92 h1:QcIgcPDGCeDKdbiDOdqMS+E9mAiG31lqJhBfZLw0C3w=
-github.com/Sherlock-Holo/libsocks v0.0.0-20180626024653-c6b26d141c92/go.mod h1:K+ljYF6lQEXf2wkTgBWhn8fZofPKrlxrWfFzSTTutJQ=
+github.com/Sherlock-Holo/libsocks v0.0.0-20190226021943-514fdf27483e h1:DQ4XhFLwVusmV9PGpKlNAtPa2lDyk/JrhE8VR/kptVM=
+github.com/Sherlock-Holo/libsocks v0.0.0-20190226021943-514fdf27483e/go.mod h1:jaHescOvrHhc0rUymZyZPMUa8LUmJ7uXSR9og50YG0U=
 github.com/Sherlock-Holo/link v0.3.0 h1:bVV3W1o1grYvFJcxEQYoaTAuFttyr+rhse/kMK8ZAzQ=
 github.com/Sherlock-Holo/link v0.3.0/go.mod h1:TRqtw2S/5okbpl6JJQt4o/a+ypUk8WxapgevtOizuOc=
 github.com/akutz/memconn v0.1.0 h1:NawI0TORU4hcOMsMr11g7vwlCdkYeLKXBcxWu2W/P8A=

@@ -48,11 +48,3 @@ func (s *Socks) Write(p []byte) (n int, err error) {
 func (s *Socks) Close() error {
 	return s.socks.Close()
 }
-
-func (s *Socks) CloseWrite() error {
-	return s.socks.CloseWrite()
-}
-
-func (s *Socks) CloseRead() error {
-	return s.socks.CloseRead()
-}
