@@ -3,6 +3,7 @@ package server
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"io"
 	"io/ioutil"
 	"log"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 
 	"github.com/Sherlock-Holo/camouflage/config/server"
+	"github.com/Sherlock-Holo/camouflage/utils"
 	wsWrapper "github.com/Sherlock-Holo/goutils/websocket"
 	"github.com/Sherlock-Holo/libsocks"
 	"github.com/Sherlock-Holo/link"
@@ -18,14 +20,26 @@ import (
 )
 
 type Server struct {
-	config   server.Config
-	upgrader websocket.Upgrader
+	config      server.Config
+	upgrader    websocket.Upgrader
+	httpServer  http.Server
+	tlsListener net.Listener
+	crl         *pkix.CertificateList
 }
 
 func (s *Server) checkRequest(w http.ResponseWriter, r *http.Request) {
 	if len(r.TLS.PeerCertificates) == 0 {
 		s.webHandle(w, r)
 		return
+	}
+
+	// check client certificate in crl or not
+	if s.crl != nil {
+		for _, certificate := range r.TLS.PeerCertificates {
+			if utils.IsRevokedCertificate(certificate, s.crl) {
+				return
+			}
+		}
 	}
 
 	if r.URL.Path != s.config.Path || !websocket.IsWebSocketUpgrade(r) {
@@ -88,14 +102,26 @@ func handle(l *link.Link) {
 	}()
 }
 
-func (s *Server) Run() *http.Server {
+func (s *Server) Run() http.Server {
+	go s.httpServer.Serve(s.tlsListener)
+
+	return s.httpServer
+}
+
+func New(cfg *server.Config) (server *Server) {
+	net.DefaultResolver.PreferGo = true
+	server = &Server{
+		config: *cfg,
+	}
+
 	tlsConfig := new(tls.Config)
 	tlsConfig.PreferServerCipherSuites = true
+	tlsConfig.NextProtos = append(tlsConfig.NextProtos, "h2")
 
 	// load client ca
 	clientCAPool := x509.NewCertPool()
 
-	clientCA, err := ioutil.ReadFile(s.config.ClientCACrt)
+	clientCA, err := ioutil.ReadFile(server.config.ClientCACrt)
 	if err != nil {
 		log.Fatalf("read client ca crt failed: %+v", errors.WithStack(err))
 	}
@@ -104,7 +130,7 @@ func (s *Server) Run() *http.Server {
 	tlsConfig.ClientCAs = clientCAPool
 
 	// load server certificate
-	serverCertificate, err := tls.LoadX509KeyPair(s.config.Crt, s.config.Key)
+	serverCertificate, err := tls.LoadX509KeyPair(server.config.Crt, server.config.Key)
 	if err != nil {
 		log.Fatalf("read server key pair failed: %+v", errors.WithStack(err))
 	}
@@ -114,27 +140,31 @@ func (s *Server) Run() *http.Server {
 	// set client auth mode, use tls.VerifyClientCertIfGiven
 	tlsConfig.ClientAuth = tls.VerifyClientCertIfGiven
 
-	tcpListener, err := net.Listen("tcp", s.config.ListenAddr)
-	if err != nil {
-		log.Fatalf("listen %s failed: %+v", s.config.ListenAddr, errors.WithStack(err))
+	// read crl
+	if cfg.Crl != "" {
+		crlBytes, err := ioutil.ReadFile(cfg.Crl)
+		if err != nil {
+			log.Fatalf("read crl file failed: %+v", errors.WithStack(err))
+		}
+		crl, err := x509.ParseCRL(crlBytes)
+		if err != nil {
+			log.Fatalf("parse crl failed: %+v", errors.WithStack(err))
+		}
+		server.crl = crl
 	}
 
-	tlsListener := tls.NewListener(tcpListener, tlsConfig)
+	tcpListener, err := net.Listen("tcp", server.config.ListenAddr)
+	if err != nil {
+		log.Fatalf("listen %s failed: %+v", server.config.ListenAddr, errors.WithStack(err))
+	}
+
+	server.tlsListener = tls.NewListener(tcpListener, tlsConfig)
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", s.checkRequest)
+	mux.HandleFunc("/", server.checkRequest)
 
-	httpServer := &http.Server{Handler: mux}
+	server.httpServer = http.Server{Handler: mux}
 
-	go httpServer.Serve(tlsListener)
-
-	return httpServer
-}
-
-func New(cfg *server.Config) (servers *Server) {
-	net.DefaultResolver.PreferGo = true
-	return &Server{
-		config: *cfg,
-	}
+	return
 }

@@ -14,6 +14,8 @@ type Config struct {
 	Crt         string `toml:"crt"`
 	Path        string `toml:"path"`
 	WebRoot     string `toml:"web_root"`
+
+	Crl string `toml:"crl"`
 }
 
 type tomlConfig struct {
