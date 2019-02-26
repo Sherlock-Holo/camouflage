@@ -10,6 +10,9 @@ debug_ca = "script/ca/ca.crt"
 
 listen_addr = "127.0.0.1:9875"
 
+# connect timeout
+timeout = "30s"
+
 
 [server]
 host = "camouflage.example.com:9876"
@@ -21,6 +24,8 @@ client_ca_crt = "script/ca/ca.crt"
 
 key = "script/server/server.key"
 crt = "script/server/server.crt"
+
+crl = "script/server/crl.pem"
 
 path = "/websocket"
 

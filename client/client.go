@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"io"
@@ -97,7 +98,12 @@ func (c *Client) reconnect() error {
 		c.manager.Close()
 	}
 
-	conn, _, err := c.wsDialer.Dial(c.wsURL, nil)
+	ctx := context.Background()
+	if c.config.Timeout.Duration > 0 {
+		ctx, _ = context.WithTimeout(context.Background(), c.config.Timeout.Duration)
+	}
+
+	conn, _, err := c.wsDialer.DialContext(ctx, c.wsURL, nil)
 	if err != nil {
 		return errors.WithStack(err)
 	}
