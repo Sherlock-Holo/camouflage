@@ -61,8 +61,16 @@ func New(cfg *client.Config) (*Client, error) {
 		tlsConfig.RootCAs = certPool
 	}
 
+	netDialer := net.Dialer{}
 	dialer := websocket.Dialer{
 		TLSClientConfig: tlsConfig,
+		NetDialContext: func(_ context.Context, network, addr string) (conn net.Conn, err error) {
+			ctx := context.Background()
+			if cfg.Timeout.Duration > 0 {
+				ctx, _ = context.WithTimeout(context.Background(), cfg.Timeout.Duration)
+			}
+			return netDialer.DialContext(ctx, network, addr)
+		},
 	}
 
 	return &Client{
@@ -98,12 +106,7 @@ func (c *Client) reconnect() error {
 		c.manager.Close()
 	}
 
-	ctx := context.Background()
-	if c.config.Timeout.Duration > 0 {
-		ctx, _ = context.WithTimeout(context.Background(), c.config.Timeout.Duration)
-	}
-
-	conn, _, err := c.wsDialer.DialContext(ctx, c.wsURL, nil)
+	conn, _, err := c.wsDialer.Dial(c.wsURL, nil)
 	if err != nil {
 		return errors.WithStack(err)
 	}
