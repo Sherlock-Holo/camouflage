@@ -31,7 +31,7 @@ crl = "script/server/crl.pem"
 path = "/websocket"
 
 # serve a static web site (optional)
-web_root = "/home/sherlock/git/blog/output"
+web_root = "/home/sherlock/git/blog/public"
 
 # sni feature for web service (optional)
 web_host = "blog.example.com:9876"

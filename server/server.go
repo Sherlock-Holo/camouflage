@@ -37,7 +37,13 @@ func (s *Server) checkRequest(w http.ResponseWriter, r *http.Request) {
 			return
 
 		case s.config.Host:
-			if !s.checkCertificate(r) {
+			exist, revoke := s.checkCertificate(r)
+			if !exist {
+				s.redirect(w, r)
+				return
+			}
+
+			if revoke {
 				return
 			}
 
@@ -45,22 +51,13 @@ func (s *Server) checkRequest(w http.ResponseWriter, r *http.Request) {
 			return
 
 		default:
-			webUrl := url.URL{
-				Scheme: "https",
-				Path:   r.URL.Path,
-			}
-			if strings.HasSuffix(s.config.WebHost, ":443") {
-				webUrl.Host = strings.Split(s.config.WebHost, ":")[0]
-			} else {
-				webUrl.Host = s.config.WebHost
-			}
-
-			http.Redirect(w, r, webUrl.String(), http.StatusFound)
+			s.redirect(w, r)
 			return
 		}
 	}
 
-	if !s.checkCertificate(r) {
+	exist, revoke := s.checkCertificate(r)
+	if !exist || revoke {
 		s.webHandle(w, r)
 		return
 	}
@@ -97,17 +94,34 @@ func (s *Server) proxyHandle(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) checkCertificate(r *http.Request) bool {
+func (s *Server) checkCertificate(r *http.Request) (exist, revoke bool) {
+	if len(r.TLS.PeerCertificates) == 0 {
+		return false, false
+	}
 	// check client certificate in crl or not
 	if s.crl != nil {
 		for _, certificate := range r.TLS.PeerCertificates {
 			if utils.IsRevokedCertificate(certificate, s.crl) {
-				return false
+				return true, false
 			}
 		}
 	}
 
-	return true
+	return true, true
+}
+
+func (s *Server) redirect(w http.ResponseWriter, r *http.Request) {
+	webUrl := url.URL{
+		Scheme: "https",
+		Path:   r.URL.Path,
+	}
+	if strings.HasSuffix(s.config.WebHost, ":443") {
+		webUrl.Host = strings.Split(s.config.WebHost, ":")[0]
+	} else {
+		webUrl.Host = s.config.WebHost
+	}
+
+	http.Redirect(w, r, webUrl.String(), http.StatusFound)
 }
 
 func handle(l link.Link) {
