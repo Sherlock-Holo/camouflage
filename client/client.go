@@ -23,7 +23,7 @@ type Client struct {
 	config      *client.Config
 	wsURL       string
 	wsDialer    websocket.Dialer
-	manager     *link.Manager
+	manager     link.Manager
 	managerLock sync.RWMutex
 }
 
@@ -110,7 +110,7 @@ func (c *Client) reconnect() error {
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	c.manager = link.NewManager(wsWrapper.NewWrapper(conn), link.KeepaliveConfig())
+	c.manager = link.NewManager(wsWrapper.NewWrapper(conn), link.KeepaliveConfig(link.ClientMode))
 	return nil
 }
 

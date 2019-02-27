@@ -53,7 +53,7 @@ func (s *Server) checkRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	manager := link.NewManager(wsWrapper.NewWrapper(conn), link.KeepaliveConfig())
+	manager := link.NewManager(wsWrapper.NewWrapper(conn), link.KeepaliveConfig(link.ServerMode))
 	for {
 		l, err := manager.Accept()
 		if err != nil {
@@ -70,7 +70,7 @@ func (s *Server) webHandle(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, s.config.WebRoot)
 }
 
-func handle(l *link.Link) {
+func handle(l link.Link) {
 	address, err := libsocks.DecodeFrom(l)
 	if err != nil {
 		log.Printf("decode socks failed: %+v", errors.WithStack(err))
