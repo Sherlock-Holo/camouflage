@@ -9,6 +9,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/Sherlock-Holo/camouflage/config/server"
 	"github.com/Sherlock-Holo/camouflage/utils"
@@ -28,20 +30,49 @@ type Server struct {
 }
 
 func (s *Server) checkRequest(w http.ResponseWriter, r *http.Request) {
-	if len(r.TLS.PeerCertificates) == 0 {
+	if s.enableWebCertificate() {
+		switch r.Host {
+		case s.config.WebHost:
+			s.webHandle(w, r)
+			return
+
+		case s.config.Host:
+			if !s.checkCertificate(r) {
+				return
+			}
+
+			s.proxyHandle(w, r)
+			return
+
+		default:
+			webUrl := url.URL{
+				Scheme: "https",
+				Path:   r.URL.Path,
+			}
+			if strings.HasSuffix(s.config.WebHost, ":443") {
+				webUrl.Host = strings.Split(s.config.WebHost, ":")[0]
+			} else {
+				webUrl.Host = s.config.WebHost
+			}
+
+			http.Redirect(w, r, webUrl.String(), http.StatusFound)
+			return
+		}
+	}
+
+	if !s.checkCertificate(r) {
 		s.webHandle(w, r)
 		return
 	}
 
-	// check client certificate in crl or not
-	if s.crl != nil {
-		for _, certificate := range r.TLS.PeerCertificates {
-			if utils.IsRevokedCertificate(certificate, s.crl) {
-				return
-			}
-		}
-	}
+	s.proxyHandle(w, r)
+}
 
+func (s *Server) webHandle(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, s.config.WebRoot)
+}
+
+func (s *Server) proxyHandle(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != s.config.Path || !websocket.IsWebSocketUpgrade(r) {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -57,7 +88,7 @@ func (s *Server) checkRequest(w http.ResponseWriter, r *http.Request) {
 	for {
 		l, err := manager.Accept()
 		if err != nil {
-			log.Println(err)
+			log.Printf("manager accept failed: %v", err)
 			manager.Close()
 			return
 		}
@@ -66,8 +97,17 @@ func (s *Server) checkRequest(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) webHandle(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, s.config.WebRoot)
+func (s *Server) checkCertificate(r *http.Request) bool {
+	// check client certificate in crl or not
+	if s.crl != nil {
+		for _, certificate := range r.TLS.PeerCertificates {
+			if utils.IsRevokedCertificate(certificate, s.crl) {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 func handle(l link.Link) {
@@ -137,8 +177,19 @@ func New(cfg *server.Config) (server *Server) {
 
 	tlsConfig.Certificates = append(tlsConfig.Certificates, serverCertificate)
 
+	if server.enableWebCertificate() {
+		// load web certificate
+		webCertificate, err := tls.LoadX509KeyPair(server.config.WebCrt, server.config.WebKey)
+		if err != nil {
+			log.Fatalf("read web key pair failed: %+v", errors.WithStack(err))
+		}
+		tlsConfig.Certificates = append(tlsConfig.Certificates, webCertificate)
+	}
+
 	// set client auth mode, use tls.VerifyClientCertIfGiven
 	tlsConfig.ClientAuth = tls.VerifyClientCertIfGiven
+
+	tlsConfig.BuildNameToCertificate()
 
 	// read crl
 	if cfg.Crl != "" {
@@ -167,4 +218,8 @@ func New(cfg *server.Config) (server *Server) {
 	server.httpServer = http.Server{Handler: mux}
 
 	return
+}
+
+func (s *Server) enableWebCertificate() bool {
+	return s.config.WebCrt != "" && s.config.WebKey != "" && s.config.WebRoot != "" && s.config.WebHost != ""
 }

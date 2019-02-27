@@ -5,12 +5,12 @@ path = "/websocket"
 key = "script/client/client.key"
 crt = "script/client/client.crt"
 
-# set a ca to debug camouflage, non-recommand use in product server
+# set a ca to debug camouflage, non-recommand use in product server (optional)
 debug_ca = "script/ca/ca.crt"
 
 listen_addr = "127.0.0.1:9875"
 
-# connect timeout
+# connect timeout (optional)
 timeout = "30s"
 
 
@@ -25,8 +25,15 @@ client_ca_crt = "script/ca/ca.crt"
 key = "script/server/server.key"
 crt = "script/server/server.crt"
 
+# crl support (optional)
 crl = "script/server/crl.pem"
 
 path = "/websocket"
 
+# serve a static web site (optional)
 web_root = "/home/sherlock/git/blog/output"
+
+# sni feature for web service (optional)
+web_host = "blog.example.com:9876"
+web_key = "script/web/web.key"
+web_crt = "script/web/web.crt"

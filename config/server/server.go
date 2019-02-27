@@ -14,8 +14,10 @@ type Config struct {
 	Crt         string `toml:"crt"`
 	Path        string `toml:"path"`
 	WebRoot     string `toml:"web_root"`
-
-	Crl string `toml:"crl"`
+	WebKey      string `toml:"web_key"`
+	WebCrt      string `toml:"web_crt"`
+	WebHost     string `toml:"web_host"`
+	Crl         string `toml:"crl"`
 }
 
 type tomlConfig struct {
