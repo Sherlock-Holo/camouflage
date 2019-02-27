@@ -145,6 +145,14 @@ func handle(l link.Link) {
 func (s *Server) Run() http.Server {
 	go s.httpServer.Serve(s.tlsListener)
 
+	if s.enableWebCertificate() {
+		log.Println("sni enable")
+	}
+	if s.config.WebRoot != "" {
+		log.Println("web service enable, web root:", s.config.WebRoot)
+	}
+	log.Println("camouflage started")
+
 	return s.httpServer
 }
 
