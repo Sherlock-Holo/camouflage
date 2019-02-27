@@ -3,6 +3,12 @@ a mux websocket over TLS proxy
 
 [![Build Status](https://travis-ci.org/Sherlock-Holo/camouflage.svg?branch=master)](https://travis-ci.org/Sherlock-Holo/camouflage)
 
+## Feature
+- standard websocket over TLS
+- mux on websocket
+- verify client by TLS certificate
+- TLS crl support
+
 ## Usage
 1. prepare your server tls key and crt file
 2. generate your ca and client tls key and crt file (recommend use gnutls)
