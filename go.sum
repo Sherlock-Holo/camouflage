@@ -6,6 +6,8 @@ github.com/Sherlock-Holo/libsocks v0.0.0-20190226021943-514fdf27483e h1:DQ4XhFLw
 github.com/Sherlock-Holo/libsocks v0.0.0-20190226021943-514fdf27483e/go.mod h1:jaHescOvrHhc0rUymZyZPMUa8LUmJ7uXSR9og50YG0U=
 github.com/Sherlock-Holo/link v0.5.1 h1:bHbUEZkITcPEw4WpdJRtItHwSVETpwC7y2PJafjshEE=
 github.com/Sherlock-Holo/link v0.5.1/go.mod h1:9mi9XskP8AAoWgGijvPYwOirhC5raP8JYHpnXusNnzs=
+github.com/Sherlock-Holo/link v0.5.2-0.20190228170736-4f3bf1e7769c h1:0L/3XPWZfO8wh+mieMk5/mMfge4W38ueNq0SZMmbgUE=
+github.com/Sherlock-Holo/link v0.5.2-0.20190228170736-4f3bf1e7769c/go.mod h1:9mi9XskP8AAoWgGijvPYwOirhC5raP8JYHpnXusNnzs=
 github.com/akutz/memconn v0.1.0 h1:NawI0TORU4hcOMsMr11g7vwlCdkYeLKXBcxWu2W/P8A=
 github.com/akutz/memconn v0.1.0/go.mod h1:Jo8rI7m0NieZyLI5e2CDlRdRqRRB4S7Xp77ukDjH+Fw=
 github.com/gorilla/websocket v1.4.0 h1:WDFjx/TMzVgy9VdMMQi2K2Emtwi2QcUQsztZ/zLaH/Q=
