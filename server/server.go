@@ -102,12 +102,12 @@ func (s *Server) checkCertificate(r *http.Request) (exist, revoke bool) {
 	if s.crl != nil {
 		for _, certificate := range r.TLS.PeerCertificates {
 			if utils.IsRevokedCertificate(certificate, s.crl) {
-				return true, false
+				return true, true
 			}
 		}
 	}
 
-	return true, true
+	return true, false
 }
 
 func (s *Server) redirect(w http.ResponseWriter, r *http.Request) {
