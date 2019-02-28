@@ -66,7 +66,8 @@ func (s *Server) checkRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) webHandle(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, s.config.WebRoot)
+	// http.ServeFile(w, r, s.config.WebRoot)
+	http.FileServer(http.Dir(s.config.WebRoot)).ServeHTTP(w, r)
 }
 
 func (s *Server) proxyHandle(w http.ResponseWriter, r *http.Request) {
