@@ -25,12 +25,8 @@ func NewSocks(conn net.Conn) (socks *Socks, err error) {
 	}, nil
 }
 
-func (s *Socks) Handshake(ok bool) error {
-	if ok {
-		return errors.WithStack(s.socks.Reply(s.socks.LocalAddr().(*net.TCPAddr).IP, uint16(s.socks.LocalAddr().(*net.TCPAddr).Port), libsocks.Success))
-	} else {
-		return errors.WithStack(s.socks.Reply(s.socks.LocalAddr().(*net.TCPAddr).IP, uint16(s.socks.LocalAddr().(*net.TCPAddr).Port), libsocks.ServerFailed))
-	}
+func (s *Socks) Handshake(respType libsocks.ResponseType) error {
+	return errors.WithStack(s.socks.Reply(s.socks.LocalAddr().(*net.TCPAddr).IP, uint16(s.socks.LocalAddr().(*net.TCPAddr).Port), respType))
 }
 
 func (s *Socks) Target() []byte {

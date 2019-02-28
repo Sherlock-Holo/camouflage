@@ -9,10 +9,11 @@ import (
 	"log"
 	"net"
 	"net/url"
-	"sync"
 
 	"github.com/Sherlock-Holo/camouflage/config/client"
+	"github.com/Sherlock-Holo/camouflage/utils"
 	wsWrapper "github.com/Sherlock-Holo/goutils/websocket"
+	"github.com/Sherlock-Holo/libsocks"
 	"github.com/Sherlock-Holo/link"
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
@@ -24,7 +25,7 @@ type Client struct {
 	wsURL       string
 	wsDialer    websocket.Dialer
 	manager     link.Manager
-	managerLock sync.RWMutex
+	connReqChan chan *connRequest
 }
 
 func New(cfg *client.Config) (*Client, error) {
@@ -65,20 +66,21 @@ func New(cfg *client.Config) (*Client, error) {
 	dialer := websocket.Dialer{
 		TLSClientConfig: tlsConfig,
 		NetDialContext: func(_ context.Context, network, addr string) (conn net.Conn, err error) {
-			ctx := context.Background()
-			if cfg.Timeout.Duration > 0 {
-				ctx, _ = context.WithTimeout(context.Background(), cfg.Timeout.Duration)
-			}
-			return netDialer.DialContext(ctx, network, addr)
+			return netDialer.DialContext(utils.TimeoutCtx(cfg.Timeout.Duration), network, addr)
 		},
 	}
 
-	return &Client{
-		listener: listener,
-		wsURL:    wsURL,
-		wsDialer: dialer,
-		config:   cfg,
-	}, nil
+	cl := &Client{
+		listener:    listener,
+		wsURL:       wsURL,
+		wsDialer:    dialer,
+		config:      cfg,
+		connReqChan: make(chan *connRequest, 100),
+	}
+
+	go cl.managerLoop()
+
+	return cl, nil
 }
 
 func (c *Client) Run() {
@@ -98,6 +100,27 @@ func (c *Client) Run() {
 		}
 
 		go c.handle(conn)
+	}
+}
+
+func (c *Client) managerLoop() {
+	for connReq := range c.connReqChan {
+		socks := connReq.Socks
+
+		if c.manager.IsClosed() {
+			if err := c.reconnect(); err != nil {
+				connReq.Err <- err
+				continue
+			}
+		}
+
+		l, err := c.manager.DialData(utils.TimeoutCtx(c.config.Timeout.Duration), socks.Target())
+		if err != nil {
+			connReq.Err <- err
+			continue
+		}
+
+		connReq.Success <- l
 	}
 }
 
@@ -121,64 +144,44 @@ func (c *Client) handle(conn net.Conn) {
 		return
 	}
 
-	var l io.ReadWriteCloser
+	connReq := &connRequest{
+		Socks:   socks,
+		Success: make(chan link.Link, 1),
+		Err:     make(chan error, 1),
+	}
 
-	c.managerLock.RLock()
-	if c.manager.IsClosed() {
-		c.managerLock.RUnlock()
+	c.connReqChan <- connReq
 
-		c.managerLock.Lock()
-		if c.manager.IsClosed() {
-			if err := c.reconnect(); err != nil {
-				log.Printf("reconnect failed: %v", err)
-				c.managerLock.Unlock()
-				socks.Close()
-				return
-			}
+	var l link.Link
 
-			l, err = c.manager.Dial()
-			if err != nil {
-				log.Printf("dial failed: %v", errors.WithStack(err))
-				c.managerLock.Unlock()
-				socks.Close()
-				return
-			}
-			c.managerLock.Unlock()
-		} else {
-			l, err = c.manager.Dial()
-			if err != nil {
-				log.Printf("dial failed: %v", errors.WithStack(err))
-				c.managerLock.Unlock()
-				socks.Close()
-				return
-			}
-			c.managerLock.Unlock()
-		}
+	select {
+	case err := <-connReq.Err:
+		log.Printf("connect failed: %+v", err)
 
-	} else {
-		l, err = c.manager.Dial()
-		if err != nil {
-			log.Printf("dial failed: %v", errors.WithStack(err))
-			c.managerLock.RUnlock()
+		switch errors.Cause(err) {
+		case context.DeadlineExceeded:
+			socks.Handshake(libsocks.TTLExpired)
+			socks.Close()
+			return
+
+		case link.ErrManagerClosed:
+			socks.Handshake(libsocks.NetworkUnreachable)
+			socks.Close()
+			return
+
+		default:
+			socks.Handshake(libsocks.ServerFailed)
 			socks.Close()
 			return
 		}
-		c.managerLock.RUnlock()
-	}
 
-	if _, err := l.Write(socks.Target()); err != nil {
-		log.Printf("send target failed: %v", err)
-		socks.Handshake(false)
-		socks.Close()
-		l.Close()
-		return
-	}
-
-	if err := socks.Handshake(true); err != nil {
-		log.Printf("handshake failed: %v", err)
-		socks.Close()
-		l.Close()
-		return
+	case l = <-connReq.Success:
+		if err := socks.Handshake(libsocks.Success); err != nil {
+			log.Printf("socks handshake failed: %+v", err)
+			socks.Close()
+			l.Close()
+			return
+		}
 	}
 
 	go func() {
