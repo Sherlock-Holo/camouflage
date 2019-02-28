@@ -141,7 +141,7 @@ func handle(l link.Link) {
 
 	go func() {
 		if _, err := io.Copy(remote, l); err != nil {
-			log.Printf("%v", err)
+			// log.Printf("forward link data to remote server failed: %v", err)
 		}
 		l.Close()
 		remote.Close()
@@ -149,7 +149,7 @@ func handle(l link.Link) {
 
 	go func() {
 		if _, err := io.Copy(l, remote); err != nil {
-			log.Printf("%v", err)
+			// log.Printf("forward remote server data to link failed: %v", err)
 		}
 		l.Close()
 		remote.Close()
