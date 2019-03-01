@@ -160,21 +160,18 @@ func (c *Client) handle(conn net.Conn) {
 		log.Printf("connect failed: %+v", err)
 
 		switch errors.Cause(err) {
-		case context.DeadlineExceeded:
+		case link.ErrTimeout:
 			socks.Handshake(libsocks.TTLExpired)
-			socks.Close()
-			return
 
 		case link.ErrManagerClosed:
 			socks.Handshake(libsocks.NetworkUnreachable)
-			socks.Close()
-			return
 
 		default:
 			socks.Handshake(libsocks.ServerFailed)
-			socks.Close()
-			return
 		}
+
+		socks.Close()
+		return
 
 	case l = <-connReq.Success:
 		if err := socks.Handshake(libsocks.Success); err != nil {
@@ -186,17 +183,19 @@ func (c *Client) handle(conn net.Conn) {
 	}
 
 	go func() {
-		if _, err := io.Copy(l, socks); err != nil {
-			log.Println(err)
-		}
+		/*if _, err := io.Copy(l, socks); err != nil {
+			// log.Println(err)
+		}*/
+		io.Copy(l, socks)
 		socks.Close()
 		l.Close()
 	}()
 
 	go func() {
-		if _, err := io.Copy(socks, l); err != nil {
-			log.Println(err)
-		}
+		/*if _, err := io.Copy(socks, l); err != nil {
+			// log.Println(err)
+		}*/
+		io.Copy(socks, l)
 		socks.Close()
 		l.Close()
 	}()
