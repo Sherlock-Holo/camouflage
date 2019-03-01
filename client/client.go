@@ -141,6 +141,7 @@ func (c *Client) handle(conn net.Conn) {
 	socks, err := NewSocks(conn)
 	if err != nil {
 		log.Printf("new socks failed: %v", err)
+		conn.Close()
 		return
 	}
 
