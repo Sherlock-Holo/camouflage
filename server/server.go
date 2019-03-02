@@ -178,9 +178,11 @@ func New(cfg *server.Config) (server *Server) {
 		config: *cfg,
 	}
 
-	tlsConfig := new(tls.Config)
-	tlsConfig.PreferServerCipherSuites = true
-	tlsConfig.NextProtos = append(tlsConfig.NextProtos, "h2")
+	tlsConfig := &tls.Config{
+		PreferServerCipherSuites: true,
+		NextProtos:               []string{"h2"},
+		MinVersion:               tls.VersionTLS12,
+	}
 
 	// load client ca
 	clientCAPool := x509.NewCertPool()

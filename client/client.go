@@ -47,6 +47,7 @@ func New(cfg *client.Config) (*Client, error) {
 
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{certificate},
+		MinVersion:   tls.VersionTLS12,
 	}
 
 	if cfg.DebugCA != "" {

@@ -13,6 +13,9 @@ listen_addr = "127.0.0.1:9875"
 # connect timeout (optional)
 timeout = "30s"
 
+# enable TLS 1.3
+TLS13 = true
+
 
 [server]
 host = "camouflage.example.com:9876"
@@ -37,3 +40,6 @@ web_root = "/home/sherlock/git/blog/public"
 web_host = "blog.example.com:9876"
 web_key = "script/web/web.key"
 web_crt = "script/web/web.crt"
+
+# enable TLS 1.3
+TLS13 = true

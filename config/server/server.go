@@ -18,6 +18,7 @@ type Config struct {
 	WebCrt      string `toml:"web_crt"`
 	WebHost     string `toml:"web_host"`
 	Crl         string `toml:"crl"`
+	TLS13       bool   `toml:"TLS13"`
 }
 
 type tomlConfig struct {
