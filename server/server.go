@@ -178,10 +178,15 @@ func New(cfg *server.Config) (server *Server) {
 		config: *cfg,
 	}
 
+	var minTLSVersion uint16 = tls.VersionTLS12
+	if cfg.TLS13 {
+		minTLSVersion = tls.VersionTLS13
+	}
+
 	tlsConfig := &tls.Config{
 		PreferServerCipherSuites: true,
 		NextProtos:               []string{"h2"},
-		MinVersion:               tls.VersionTLS12,
+		MinVersion:               minTLSVersion,
 	}
 
 	// load client ca

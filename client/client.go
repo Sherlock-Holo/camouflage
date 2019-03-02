@@ -45,9 +45,14 @@ func New(cfg *client.Config) (*Client, error) {
 		log.Fatalf("read key pair failed: %+v", errors.WithStack(err))
 	}
 
+	var minTLSVersion uint16 = tls.VersionTLS12
+	if cfg.TLS13 {
+		minTLSVersion = tls.VersionTLS13
+	}
+
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{certificate},
-		MinVersion:   tls.VersionTLS12,
+		MinVersion:   minTLSVersion,
 	}
 
 	if cfg.DebugCA != "" {
