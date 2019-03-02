@@ -2,10 +2,8 @@ package server
 
 import (
 	"crypto/tls"
-	"crypto/x509"
 	"crypto/x509/pkix"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -38,13 +36,21 @@ func (s *Server) checkRequest(w http.ResponseWriter, r *http.Request) {
 			return
 
 		case s.config.Host:
-			exist, revoke := s.checkCertificate(r)
-			if !exist {
+			if !websocket.IsWebSocketUpgrade(r) {
 				s.redirect(w, r)
 				return
 			}
 
-			if revoke {
+			code := r.Header.Get("totp-code")
+			ok, err := utils.VerifyCode(code, s.config.Secret, s.config.Period)
+			if err != nil {
+				http.Error(w, "server internal error", http.StatusInternalServerError)
+				log.Printf("verify code failed: %+v", err)
+				return
+			}
+
+			if !ok {
+				w.WriteHeader(http.StatusForbidden)
 				return
 			}
 
@@ -57,8 +63,15 @@ func (s *Server) checkRequest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	exist, revoke := s.checkCertificate(r)
-	if !exist || revoke {
+	code := r.Header.Get("totp-code")
+	ok, err := utils.VerifyCode(code, s.config.Secret, s.config.Period)
+	if err != nil {
+		http.Error(w, "server internal error", http.StatusInternalServerError)
+		log.Printf("verify code failed: %+v", err)
+		return
+	}
+
+	if !ok || !websocket.IsWebSocketUpgrade(r) {
 		s.webHandle(w, r)
 		return
 	}
@@ -71,11 +84,6 @@ func (s *Server) webHandle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) proxyHandle(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != s.config.Path || !websocket.IsWebSocketUpgrade(r) {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("websocket upgrade failed: %s", errors.WithStack(err))
@@ -96,22 +104,6 @@ func (s *Server) proxyHandle(w http.ResponseWriter, r *http.Request) {
 
 		go handle(l)
 	}
-}
-
-func (s *Server) checkCertificate(r *http.Request) (exist, revoke bool) {
-	if len(r.TLS.PeerCertificates) == 0 {
-		return false, false
-	}
-	// check client certificate in crl or not
-	if s.crl != nil {
-		for _, certificate := range r.TLS.PeerCertificates {
-			if utils.IsRevokedCertificate(certificate, s.crl) {
-				return true, true
-			}
-		}
-	}
-
-	return true, false
 }
 
 func (s *Server) redirect(w http.ResponseWriter, r *http.Request) {
@@ -197,17 +189,6 @@ func New(cfg *server.Config) (server *Server) {
 		MinVersion:               minTLSVersion,
 	}
 
-	// load client ca
-	clientCAPool := x509.NewCertPool()
-
-	clientCA, err := ioutil.ReadFile(server.config.ClientCACrt)
-	if err != nil {
-		log.Fatalf("read client ca crt failed: %+v", errors.WithStack(err))
-	}
-
-	clientCAPool.AppendCertsFromPEM(clientCA)
-	tlsConfig.ClientCAs = clientCAPool
-
 	// load server certificate
 	serverCertificate, err := tls.LoadX509KeyPair(server.config.Crt, server.config.Key)
 	if err != nil {
@@ -225,23 +206,7 @@ func New(cfg *server.Config) (server *Server) {
 		tlsConfig.Certificates = append(tlsConfig.Certificates, webCertificate)
 	}
 
-	// set client auth mode, use tls.VerifyClientCertIfGiven
-	tlsConfig.ClientAuth = tls.VerifyClientCertIfGiven
-
 	tlsConfig.BuildNameToCertificate()
-
-	// read crl
-	if cfg.Crl != "" {
-		crlBytes, err := ioutil.ReadFile(cfg.Crl)
-		if err != nil {
-			log.Fatalf("read crl file failed: %+v", errors.WithStack(err))
-		}
-		crl, err := x509.ParseCRL(crlBytes)
-		if err != nil {
-			log.Fatalf("parse crl failed: %+v", errors.WithStack(err))
-		}
-		server.crl = crl
-	}
 
 	tcpListener, err := net.Listen("tcp", server.config.ListenAddr)
 	if err != nil {

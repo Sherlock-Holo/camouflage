@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"net/http"
 	"net/url"
 	"time"
 
@@ -37,13 +38,7 @@ func New(cfg *client.Config) (*Client, error) {
 	wsURL := (&url.URL{
 		Scheme: "wss",
 		Host:   cfg.RemoteAddr,
-		Path:   cfg.Path,
 	}).String()
-
-	certificate, err := tls.LoadX509KeyPair(cfg.Crt, cfg.Key)
-	if err != nil {
-		log.Fatalf("read key pair failed: %+v", errors.WithStack(err))
-	}
 
 	var minTLSVersion uint16 = tls.VersionTLS12
 	if cfg.TLS13 {
@@ -52,8 +47,7 @@ func New(cfg *client.Config) (*Client, error) {
 	}
 
 	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{certificate},
-		MinVersion:   minTLSVersion,
+		MinVersion: minTLSVersion,
 	}
 
 	if cfg.DebugCA != "" {
@@ -131,14 +125,38 @@ func (c *Client) managerLoop() {
 	}
 }
 
-func (c *Client) reconnect() error {
+func (c *Client) reconnect() (err error) {
 	if c.manager != nil {
 		c.manager.Close()
 	}
 
-	conn, _, err := c.wsDialer.Dial(c.wsURL, nil)
-	if err != nil {
-		return errors.WithStack(err)
+	var (
+		conn *websocket.Conn
+		resp *http.Response
+	)
+	for i := 0; i < 2; i++ {
+		code, err := utils.GenCode(c.config.Secret, c.config.Period)
+		if err != nil {
+			return errors.Wrap(err, "connect server failed")
+		}
+
+		httpHeader := http.Header{}
+		httpHeader.Set("totp-code", code)
+
+		conn, resp, err = c.wsDialer.Dial(c.wsURL, httpHeader)
+		if err != nil {
+			resp.Body.Close()
+
+			if errors.Cause(err) == websocket.ErrBadHandshake && resp.StatusCode == http.StatusForbidden {
+				if i == 1 {
+					return errors.New("maybe TOTP secret is wrong")
+				} else {
+					continue
+				}
+			}
+
+			return errors.Wrap(err, "connect server failed")
+		}
 	}
 
 	linkCfg := link.DefaultConfig(link.ClientMode)
@@ -194,18 +212,12 @@ func (c *Client) handle(conn net.Conn) {
 	}
 
 	go func() {
-		/*if _, err := io.Copy(l, socks); err != nil {
-			// log.Println(err)
-		}*/
 		io.Copy(l, socks)
 		socks.Close()
 		l.Close()
 	}()
 
 	go func() {
-		/*if _, err := io.Copy(socks, l); err != nil {
-			// log.Println(err)
-		}*/
 		io.Copy(socks, l)
 		socks.Close()
 		l.Close()
