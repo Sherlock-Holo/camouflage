@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/url"
+	"time"
 
 	"github.com/Sherlock-Holo/camouflage/config/client"
 	"github.com/Sherlock-Holo/camouflage/utils"
@@ -140,7 +141,11 @@ func (c *Client) reconnect() error {
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	c.manager = link.NewManager(wsWrapper.NewWrapper(conn), link.KeepaliveConfig(link.ClientMode))
+
+	linkCfg := link.DefaultConfig(link.ClientMode)
+	linkCfg.KeepaliveInterval = 5 * time.Second
+
+	c.manager = link.NewManager(wsWrapper.NewWrapper(conn), linkCfg)
 	return nil
 }
 

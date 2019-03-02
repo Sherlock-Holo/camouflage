@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/Sherlock-Holo/camouflage/config/server"
 	"github.com/Sherlock-Holo/camouflage/utils"
@@ -81,7 +82,10 @@ func (s *Server) proxyHandle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	manager := link.NewManager(wsWrapper.NewWrapper(conn), link.KeepaliveConfig(link.ServerMode))
+	linkCfg := link.DefaultConfig(link.ClientMode)
+	linkCfg.KeepaliveInterval = 5 * time.Second
+
+	manager := link.NewManager(wsWrapper.NewWrapper(conn), linkCfg)
 	for {
 		l, err := manager.Accept()
 		if err != nil {
