@@ -1,7 +1,6 @@
 package client
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"io"
@@ -70,12 +69,12 @@ func New(cfg *client.Config) (*Client, error) {
 		tlsConfig.RootCAs = certPool
 	}
 
-	netDialer := net.Dialer{}
 	dialer := websocket.Dialer{
 		TLSClientConfig: tlsConfig,
-		NetDialContext: func(_ context.Context, network, addr string) (conn net.Conn, err error) {
-			return netDialer.DialContext(utils.TimeoutCtx(cfg.Timeout.Duration), network, addr)
-		},
+	}
+
+	if cfg.Timeout.Duration > 0 {
+		dialer.HandshakeTimeout = cfg.Timeout.Duration
 	}
 
 	cl := &Client{

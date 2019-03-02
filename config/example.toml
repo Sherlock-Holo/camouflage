@@ -10,7 +10,7 @@ debug_ca = "script/ca/ca.crt"
 
 listen_addr = "127.0.0.1:9875"
 
-# connect timeout (optional)
+# handshake timeout (optional)
 timeout = "30s"
 
 # enable TLS 1.3
@@ -43,3 +43,6 @@ web_crt = "script/web/web.crt"
 
 # enable TLS 1.3
 TLS13 = true
+
+# handshake timeout (optional)
+timeout = "30s"

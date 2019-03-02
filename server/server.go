@@ -177,9 +177,12 @@ func (s *Server) Run() http.Server {
 }
 
 func New(cfg *server.Config) (server *Server) {
-	net.DefaultResolver.PreferGo = true
 	server = &Server{
 		config: *cfg,
+	}
+
+	if cfg.Timeout.Duration > 0 {
+		server.upgrader.HandshakeTimeout = cfg.Timeout.Duration
 	}
 
 	var minTLSVersion uint16 = tls.VersionTLS12
