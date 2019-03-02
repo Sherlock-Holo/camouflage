@@ -10,12 +10,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var clientConfig string
+
 var clientCmd = &cobra.Command{
 	Use:   "client",
 	Short: "client mode",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		cfg, err := config.New(args[0])
+	Run: func(_ *cobra.Command, _ []string) {
+		cfg, err := config.New(clientConfig)
 		if err != nil {
 			log.Fatalf("%v", err)
 		}

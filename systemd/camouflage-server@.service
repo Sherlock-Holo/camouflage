@@ -3,7 +3,7 @@ Description=Camouflage server service
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/camouflage server /etc/camouflage/%i.toml
+ExecStart=/usr/bin/camouflage server -f /etc/camouflage/%i.toml
 MemoryAccounting=true
 Restart=on-failure
 RestartSec=3
