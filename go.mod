@@ -3,7 +3,7 @@ module github.com/Sherlock-Holo/camouflage
 require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/Sherlock-Holo/goutils/websocket v0.0.0-20190227124339-861fac9fe37b
-	github.com/Sherlock-Holo/libsocks v0.0.0-20190226021943-514fdf27483e
+	github.com/Sherlock-Holo/libsocks v0.0.0-20190302123837-cd547cfd3eaf
 	github.com/Sherlock-Holo/link v0.6.1-0.20190228183940-8e87bafa56d7
 	github.com/gorilla/websocket v1.4.0
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
