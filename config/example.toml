@@ -1,9 +1,5 @@
 [client]
 remote_addr = "camouflage.example.com:9876"
-path = "/websocket"
-
-key = "script/client/client.key"
-crt = "script/client/client.crt"
 
 # set a ca to debug camouflage, non-recommand use in product server (optional)
 debug_ca = "script/ca/ca.crt"
@@ -16,22 +12,18 @@ timeout = "30s"
 # enable TLS 1.3
 TLS13 = true
 
+# TOTP secret
+secret = "V5PWBWKLNKOSGQIIB2J2GLIAMSS4IGQJ"
+period = 60
+
 
 [server]
 host = "camouflage.example.com:9876"
 
 listen_addr = "127.0.0.1:9876"
 
-client_ca_key = "script/ca/ca.key"
-client_ca_crt = "script/ca/ca.crt"
-
 key = "script/server/server.key"
 crt = "script/server/server.crt"
-
-# crl support (optional)
-crl = "script/server/crl.pem"
-
-path = "/websocket"
 
 # serve a static web site (optional)
 web_root = "/home/sherlock/git/blog/public"
@@ -46,3 +38,7 @@ TLS13 = true
 
 # handshake timeout (optional)
 timeout = "30s"
+
+# TOTP secret
+secret = "V5PWBWKLNKOSGQIIB2J2GLIAMSS4IGQJ"
+period = 60

@@ -17,20 +17,18 @@ func (d *Duration) UnmarshalText(text []byte) (err error) {
 }
 
 type Config struct {
-	Host        string   `toml:"host"`
-	ListenAddr  string   `toml:"listen_addr"`
-	ClientCAKey string   `toml:"client_ca_key"`
-	ClientCACrt string   `toml:"client_ca_crt"`
-	Key         string   `toml:"key"`
-	Crt         string   `toml:"crt"`
-	Path        string   `toml:"path"`
-	WebRoot     string   `toml:"web_root"`
-	WebKey      string   `toml:"web_key"`
-	WebCrt      string   `toml:"web_crt"`
-	WebHost     string   `toml:"web_host"`
-	Crl         string   `toml:"crl"`
-	TLS13       bool     `toml:"TLS13"`
-	Timeout     Duration `toml:"timeout"`
+	Host       string   `toml:"host"`
+	ListenAddr string   `toml:"listen_addr"`
+	Key        string   `toml:"key"`
+	Crt        string   `toml:"crt"`
+	WebRoot    string   `toml:"web_root"`
+	WebKey     string   `toml:"web_key"`
+	WebCrt     string   `toml:"web_crt"`
+	WebHost    string   `toml:"web_host"`
+	TLS13      bool     `toml:"TLS13"`
+	Timeout    Duration `toml:"timeout"`
+	Secret     string   `toml:"secret"`
+	Period     uint     `toml:"period"`
 }
 
 type tomlConfig struct {

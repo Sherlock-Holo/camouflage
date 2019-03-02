@@ -17,13 +17,12 @@ func (d *Duration) UnmarshalText(text []byte) (err error) {
 
 type Config struct {
 	RemoteAddr string   `toml:"remote_addr"`
-	Path       string   `toml:"path"`
-	Key        string   `toml:"key"`
-	Crt        string   `toml:"crt"`
 	DebugCA    string   `toml:"debug_ca"`
 	ListenAddr string   `toml:"listen_addr"`
 	Timeout    Duration `toml:"timeout"`
 	TLS13      bool     `toml:"TLS13"`
+	Secret     string   `toml:"secret"`
+	Period     uint     `toml:"period"`
 }
 
 type tomlConfig struct {
