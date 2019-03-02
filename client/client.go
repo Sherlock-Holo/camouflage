@@ -48,6 +48,7 @@ func New(cfg *client.Config) (*Client, error) {
 	var minTLSVersion uint16 = tls.VersionTLS12
 	if cfg.TLS13 {
 		minTLSVersion = tls.VersionTLS13
+		log.Println("try to enable TLS 1.3")
 	}
 
 	tlsConfig := &tls.Config{
