@@ -40,15 +40,7 @@ func New(cfg *client.Config) (*Client, error) {
 		Host:   cfg.RemoteAddr,
 	}).String()
 
-	var minTLSVersion uint16 = tls.VersionTLS12
-	if cfg.TLS13 {
-		minTLSVersion = tls.VersionTLS13
-		log.Println("try to enable TLS 1.3")
-	}
-
-	tlsConfig := &tls.Config{
-		MinVersion: minTLSVersion,
-	}
+	tlsConfig := new(tls.Config)
 
 	if cfg.DebugCA != "" {
 		certPool := x509.NewCertPool()
@@ -96,7 +88,7 @@ func (c *Client) Run() {
 	for {
 		conn, err := c.listener.Accept()
 		if err != nil {
-			log.Printf("accept failed: %s", errors.WithStack(err))
+			log.Printf("accept failed: %v", errors.WithStack(err))
 			continue
 		}
 
@@ -147,6 +139,8 @@ func (c *Client) reconnect() (err error) {
 
 		switch errors.Cause(err) {
 		case websocket.ErrBadHandshake:
+			resp.Body.Close()
+
 			if resp.StatusCode == http.StatusForbidden {
 				if i == 1 {
 					return errors.New("maybe TOTP secret is wrong")
@@ -174,7 +168,6 @@ func (c *Client) handle(conn net.Conn) {
 	socks, err := NewSocks(conn)
 	if err != nil {
 		log.Printf("%v", err)
-		conn.Close()
 		return
 	}
 
@@ -190,7 +183,7 @@ func (c *Client) handle(conn net.Conn) {
 
 	select {
 	case err := <-connReq.Err:
-		log.Printf("connect failed: %+v", err)
+		log.Printf("dial link failed: %+v", err)
 
 		switch errors.Cause(err) {
 		case link.ErrTimeout:

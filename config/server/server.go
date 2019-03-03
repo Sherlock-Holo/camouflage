@@ -25,7 +25,6 @@ type Config struct {
 	WebKey     string   `toml:"web_key"`
 	WebCrt     string   `toml:"web_crt"`
 	WebHost    string   `toml:"web_host"`
-	TLS13      bool     `toml:"TLS13"`
 	Timeout    Duration `toml:"timeout"`
 	Secret     string   `toml:"secret"`
 	Period     uint     `toml:"period"`
