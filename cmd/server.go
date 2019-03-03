@@ -15,7 +15,7 @@ var serverConfig string
 var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "server mode",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.NoArgs,
 	Run: func(_ *cobra.Command, _ []string) {
 		cfg, err := config.New(serverConfig)
 		if err != nil {

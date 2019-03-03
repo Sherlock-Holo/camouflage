@@ -15,7 +15,7 @@ var clientConfig string
 var clientCmd = &cobra.Command{
 	Use:   "client",
 	Short: "client mode",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.NoArgs,
 	Run: func(_ *cobra.Command, _ []string) {
 		cfg, err := config.New(clientConfig)
 		if err != nil {
