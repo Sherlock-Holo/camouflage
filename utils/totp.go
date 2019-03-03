@@ -33,17 +33,23 @@ func GenTOTPSecret(period uint) string {
 }
 
 func VerifyCode(code, secret string, period uint) (ok bool, err error) {
-	return totp.ValidateCustom(code, secret, time.Now(), totp.ValidateOpts{
+	if len(code) != int(otp.DigitsEight) {
+		return false, nil
+	}
+
+	ok, err = totp.ValidateCustom(code, secret, time.Now(), totp.ValidateOpts{
 		Algorithm: algorithm,
 		Digits:    digits,
 		Period:    period,
 	})
+	return ok, errors.Wrap(err, "verify TOTP code failed")
 }
 
 func GenCode(secret string, period uint) (code string, err error) {
-	return totp.GenerateCodeCustom(secret, time.Now(), totp.ValidateOpts{
+	code, err = totp.GenerateCodeCustom(secret, time.Now(), totp.ValidateOpts{
 		Algorithm: algorithm,
 		Digits:    digits,
 		Period:    period,
 	})
+	return code, errors.Wrap(err, "generate TOTP code failed")
 }

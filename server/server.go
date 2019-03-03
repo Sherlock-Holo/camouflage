@@ -7,8 +7,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
-	"strings"
 	"time"
 
 	"github.com/Sherlock-Holo/camouflage/config/server"
@@ -37,7 +35,7 @@ func (s *Server) checkRequest(w http.ResponseWriter, r *http.Request) {
 
 		case s.config.Host:
 			if !websocket.IsWebSocketUpgrade(r) {
-				s.redirect(w, r)
+				http.Error(w, "Forbidden", http.StatusForbidden)
 				return
 			}
 
@@ -50,7 +48,7 @@ func (s *Server) checkRequest(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if !ok {
-				w.WriteHeader(http.StatusForbidden)
+				http.Error(w, "Forbidden", http.StatusForbidden)
 				return
 			}
 
@@ -58,7 +56,7 @@ func (s *Server) checkRequest(w http.ResponseWriter, r *http.Request) {
 			return
 
 		default:
-			s.redirect(w, r)
+			http.Error(w, "Bad Gateway", http.StatusBadGateway)
 			return
 		}
 	}
@@ -106,7 +104,7 @@ func (s *Server) proxyHandle(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) redirect(w http.ResponseWriter, r *http.Request) {
+/*func (s *Server) redirect(w http.ResponseWriter, r *http.Request) {
 	webUrl := url.URL{
 		Scheme: "https",
 		Path:   r.URL.Path,
@@ -118,7 +116,7 @@ func (s *Server) redirect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, webUrl.String(), http.StatusFound)
-}
+}*/
 
 func handle(l link.Link) {
 	address, err := libsocks.DecodeFrom(l)
