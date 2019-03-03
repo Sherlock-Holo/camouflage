@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"io"
@@ -177,7 +178,20 @@ func (c *Client) handle(conn net.Conn) {
 		Err:     make(chan error, 1),
 	}
 
-	c.connReqChan <- connReq
+	timeoutCtx := context.Background()
+	if c.config.Timeout.Duration > 0 {
+		timeoutCtx, _ = context.WithTimeout(context.Background(), c.config.Timeout.Duration)
+	}
+
+	select {
+	case <-timeoutCtx.Done():
+		log.Printf("dial queue is full")
+		socks.Handshake(libsocks.TTLExpired)
+		socks.Close()
+		return
+
+	case c.connReqChan <- connReq:
+	}
 
 	var l link.Link
 
