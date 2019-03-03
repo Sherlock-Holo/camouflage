@@ -144,18 +144,22 @@ func (c *Client) reconnect() (err error) {
 		httpHeader.Set("totp-code", code)
 
 		conn, resp, err = c.wsDialer.Dial(c.wsURL, httpHeader)
-		if err != nil {
-			resp.Body.Close()
 
-			if errors.Cause(err) == websocket.ErrBadHandshake && resp.StatusCode == http.StatusForbidden {
+		switch errors.Cause(err) {
+		case websocket.ErrBadHandshake:
+			if resp.StatusCode == http.StatusForbidden {
 				if i == 1 {
 					return errors.New("maybe TOTP secret is wrong")
 				} else {
 					continue
 				}
 			}
-
 			return errors.Wrap(err, "connect server failed")
+
+		default:
+			return errors.Wrap(err, "connect server failed")
+
+		case nil:
 		}
 	}
 
