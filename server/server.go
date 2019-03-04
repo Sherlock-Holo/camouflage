@@ -78,6 +78,11 @@ func (s *Server) checkRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) webHandle(w http.ResponseWriter, r *http.Request) {
+	if s.config.WebRoot == "" {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
 	http.FileServer(http.Dir(s.config.WebRoot)).ServeHTTP(w, r)
 }
 
