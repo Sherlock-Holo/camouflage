@@ -1,9 +1,9 @@
 package cmd
 
 import (
-	"github.com/Sherlock-Holo/camouflage/utils"
 	"log"
 
+	"github.com/Sherlock-Holo/camouflage/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -18,12 +18,12 @@ func Execute() {
 	rootCmd.AddCommand(
 		clientCmd,
 		serverCmd,
-		genTOTPSecret,
+		genSecret,
 	)
 
 	clientCmd.Flags().StringVarP(&clientConfig, "file", "f", "", "client config file")
 	serverCmd.Flags().StringVarP(&serverConfig, "file", "f", "", "server config file")
-	genTOTPSecret.Flags().UintVarP(&period, "period", "p", utils.DefaultPeriod, "TOTP period")
+	genSecret.Flags().UintVarP(&period, "period", "p", utils.DefaultPeriod, "TOTP period")
 
 	rootCmd.InitDefaultVersionFlag()
 
