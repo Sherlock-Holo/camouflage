@@ -109,7 +109,7 @@ func handle(l link.Link) {
 func (s *Server) Run() http.Server {
 	go s.httpServer.Serve(s.tlsListener)
 
-	if s.WebCertificateIsEnabled() {
+	if s.webCertificateIsEnabled() {
 		log.Println("sni enable")
 	}
 
@@ -137,6 +137,22 @@ func New(cfg *server.Config) (server *Server) {
 	tlsConfig := &tls.Config{
 		PreferServerCipherSuites: true,
 		NextProtos:               []string{"h2"},
+		MinVersion:               tls.VersionTLS12,
+
+		// follow https://blog.gopheracademy.com/advent-2016/exposing-go-on-the-internet/ to optimize server
+		// Only use curves which have assembly implementations
+		CurvePreferences: []tls.CurveID{
+			tls.CurveP256,
+			tls.X25519,
+		},
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		},
 	}
 
 	// load server certificate
@@ -147,7 +163,7 @@ func New(cfg *server.Config) (server *Server) {
 
 	tlsConfig.Certificates = append(tlsConfig.Certificates, serverCertificate)
 
-	if server.WebCertificateIsEnabled() {
+	if server.webCertificateIsEnabled() {
 		// load web certificate
 		webCertificate, err := tls.LoadX509KeyPair(server.config.WebCrt, server.config.WebKey)
 		if err != nil {
@@ -174,7 +190,7 @@ func New(cfg *server.Config) (server *Server) {
 
 	mux := http.NewServeMux()
 
-	if server.WebCertificateIsEnabled() {
+	if server.webCertificateIsEnabled() {
 		mux.HandleFunc(server.config.Host+"/", server.proxyHandle)
 		mux.HandleFunc(server.config.WebHost+"/", server.webHandle)
 	} else {
@@ -208,7 +224,7 @@ func New(cfg *server.Config) (server *Server) {
 	return
 }
 
-func (s *Server) WebCertificateIsEnabled() bool {
+func (s *Server) webCertificateIsEnabled() bool {
 	return s.config.WebCrt != "" && s.config.WebKey != "" && s.config.WebRoot != "" && s.config.WebHost != ""
 }
 
