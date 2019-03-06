@@ -17,17 +17,21 @@ func (d *Duration) UnmarshalText(text []byte) (err error) {
 }
 
 type Config struct {
-	Host       string   `toml:"host"`
-	ListenAddr string   `toml:"listen_addr"`
-	Key        string   `toml:"key"`
-	Crt        string   `toml:"crt"`
-	WebRoot    string   `toml:"web_root"`
-	WebKey     string   `toml:"web_key"`
-	WebCrt     string   `toml:"web_crt"`
-	WebHost    string   `toml:"web_host"`
-	Timeout    Duration `toml:"timeout"`
-	Secret     string   `toml:"secret"`
-	Period     uint     `toml:"period"`
+	Host             string   `toml:"host"`
+	ListenAddr       string   `toml:"listen_addr"`
+	Key              string   `toml:"key"`
+	Crt              string   `toml:"crt"`
+	WebRoot          string   `toml:"web_root"`
+	WebKey           string   `toml:"web_key"`
+	WebCrt           string   `toml:"web_crt"`
+	WebHost          string   `toml:"web_host"`
+	Timeout          Duration `toml:"timeout"`
+	Secret           string   `toml:"secret"`
+	Period           uint     `toml:"period"`
+	ReverseProxyHost string   `toml:"reverse_proxy_host"`
+	ReverseProxyKey  string   `toml:"reverse_proxy_key"`
+	ReverseProxyCrt  string   `toml:"reverse_proxy_crt"`
+	ReverseProxyAddr string   `toml:"reverse_proxy_addr"`
 }
 
 type tomlConfig struct {

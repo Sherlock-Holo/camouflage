@@ -15,7 +15,7 @@ period = 60
 
 
 [server]
-host = "camouflage.example.com:9876"
+host = "camouflage.example.com"
 
 listen_addr = "127.0.0.1:9876"
 
@@ -26,7 +26,7 @@ crt = "script/server/server.crt"
 web_root = "/home/sherlock/git/blog/public"
 
 # sni feature for web service (optional)
-web_host = "blog.example.com:9876"
+web_host = "blog.example.com"
 web_key = "script/web/web.key"
 web_crt = "script/web/web.crt"
 
@@ -36,3 +36,9 @@ timeout = "30s"
 # TOTP secret
 secret = "V5PWBWKLNKOSGQIIB2J2GLIAMSS4IGQJ"
 period = 60
+
+# reverse proxy (optional)
+reverse_proxy_host = "rp.example.com"
+reverse_proxy_key = "script/rp/rp.key"
+reverse_proxy_crt = "script/rp/rp.crt"
+reverse_proxy_addr = "127.0.0.1:80"
