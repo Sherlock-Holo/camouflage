@@ -7,7 +7,7 @@ case $state in
   level1)
     case $words[1] in
       camouflage)
-        _arguments '1: :(client genTOTPSecret server)'
+        _arguments '1: :(client completion genTOTPSecret help server)'
       ;;
       *)
         _arguments '*: :_files'

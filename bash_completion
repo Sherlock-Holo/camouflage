@@ -257,6 +257,32 @@ _camouflage_client()
     flags_with_completion=()
     flags_completion=()
 
+    flags+=("--file=")
+    two_word_flags+=("-f")
+    local_nonpersistent_flags+=("--file=")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_camouflage_completion()
+{
+    last_command="camouflage_completion"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--help")
+    flags+=("-h")
+    local_nonpersistent_flags+=("--help")
 
     must_have_one_flag=()
     must_have_one_noun=()
@@ -277,6 +303,9 @@ _camouflage_genTOTPSecret()
     flags_with_completion=()
     flags_completion=()
 
+    flags+=("--period=")
+    two_word_flags+=("-p")
+    local_nonpersistent_flags+=("--period=")
 
     must_have_one_flag=()
     must_have_one_noun=()
@@ -297,6 +326,9 @@ _camouflage_server()
     flags_with_completion=()
     flags_completion=()
 
+    flags+=("--file=")
+    two_word_flags+=("-f")
+    local_nonpersistent_flags+=("--file=")
 
     must_have_one_flag=()
     must_have_one_noun=()
@@ -311,6 +343,7 @@ _camouflage_root_command()
 
     commands=()
     commands+=("client")
+    commands+=("completion")
     commands+=("genTOTPSecret")
     commands+=("server")
 
@@ -320,6 +353,8 @@ _camouflage_root_command()
     flags_with_completion=()
     flags_completion=()
 
+    flags+=("--version")
+    local_nonpersistent_flags+=("--version")
 
     must_have_one_flag=()
     must_have_one_noun=()
