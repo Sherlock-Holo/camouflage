@@ -7,6 +7,9 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/Sherlock-Holo/camouflage/config/server"
@@ -106,9 +109,14 @@ func handle(l link.Link) {
 func (s *Server) Run() http.Server {
 	go s.httpServer.Serve(s.tlsListener)
 
-	if s.enableWebCertificate() {
+	if s.webCertificateIsEnabled() {
 		log.Println("sni enable")
 	}
+
+	if s.reverseProxyIsEnabled() {
+		log.Println("reverse proxy enable")
+	}
+
 	if s.config.WebRoot != "" {
 		log.Println("web service enable, web root:", s.config.WebRoot)
 	}
@@ -129,6 +137,22 @@ func New(cfg *server.Config) (server *Server) {
 	tlsConfig := &tls.Config{
 		PreferServerCipherSuites: true,
 		NextProtos:               []string{"h2"},
+		MinVersion:               tls.VersionTLS12,
+
+		// follow https://blog.gopheracademy.com/advent-2016/exposing-go-on-the-internet/ to optimize server
+		// Only use curves which have assembly implementations
+		CurvePreferences: []tls.CurveID{
+			tls.CurveP256,
+			tls.X25519,
+		},
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		},
 	}
 
 	// load server certificate
@@ -139,13 +163,22 @@ func New(cfg *server.Config) (server *Server) {
 
 	tlsConfig.Certificates = append(tlsConfig.Certificates, serverCertificate)
 
-	if server.enableWebCertificate() {
+	if server.webCertificateIsEnabled() {
 		// load web certificate
 		webCertificate, err := tls.LoadX509KeyPair(server.config.WebCrt, server.config.WebKey)
 		if err != nil {
 			log.Fatalf("read web key pair failed: %+v", errors.WithStack(err))
 		}
 		tlsConfig.Certificates = append(tlsConfig.Certificates, webCertificate)
+	}
+
+	if server.reverseProxyIsEnabled() {
+		// load read reverse certificate
+		reverseProxyCertificate, err := tls.LoadX509KeyPair(server.config.ReverseProxyCrt, server.config.ReverseProxyKey)
+		if err != nil {
+			log.Fatalf("read reverse proxy key pair failed: %+v", errors.WithStack(err))
+		}
+		tlsConfig.Certificates = append(tlsConfig.Certificates, reverseProxyCertificate)
 	}
 
 	tlsConfig.BuildNameToCertificate()
@@ -157,11 +190,33 @@ func New(cfg *server.Config) (server *Server) {
 
 	mux := http.NewServeMux()
 
-	if server.enableWebCertificate() {
+	if server.webCertificateIsEnabled() {
 		mux.HandleFunc(server.config.Host+"/", server.proxyHandle)
 		mux.HandleFunc(server.config.WebHost+"/", server.webHandle)
 	} else {
-		mux.HandleFunc("/", server.checkRequest)
+		mux.HandleFunc(server.config.Host+"/", server.checkRequest)
+	}
+
+	// enable reverse proxy
+	if server.reverseProxyIsEnabled() {
+		if !strings.HasPrefix(server.config.ReverseProxyAddr, "http") && !strings.HasPrefix(server.config.ReverseProxyAddr, "https") {
+			server.config.ReverseProxyAddr = "http://" + server.config.ReverseProxyAddr
+		}
+
+		u, err := url.Parse(server.config.ReverseProxyAddr)
+		if err != nil {
+			log.Fatalf("parse reverse proxy addr failed: %+v", errors.WithStack(err))
+		}
+
+		proxy := httputil.NewSingleHostReverseProxy(u)
+		originDirector := proxy.Director
+		proxy.Director = func(r *http.Request) {
+			originDirector(r)
+			// delete origin field to avoid websocket upgrade check failed
+			r.Header.Del("origin")
+		}
+
+		mux.Handle(server.config.ReverseProxyHost+"/", proxy)
 	}
 
 	server.httpServer = http.Server{Handler: mux}
@@ -169,6 +224,10 @@ func New(cfg *server.Config) (server *Server) {
 	return
 }
 
-func (s *Server) enableWebCertificate() bool {
+func (s *Server) webCertificateIsEnabled() bool {
 	return s.config.WebCrt != "" && s.config.WebKey != "" && s.config.WebRoot != "" && s.config.WebHost != ""
+}
+
+func (s *Server) reverseProxyIsEnabled() bool {
+	return s.config.ReverseProxyHost != "" && s.config.ReverseProxyCrt != "" && s.config.ReverseProxyKey != "" && s.config.ReverseProxyAddr != ""
 }

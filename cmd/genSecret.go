@@ -8,8 +8,8 @@ import (
 
 var period uint
 
-var genTOTPSecret = &cobra.Command{
-	Use:   "genTOTPSecret",
+var genSecret = &cobra.Command{
+	Use:   "genSecret",
 	Short: fmt.Sprintf("generate TOTP secret, default period is %d", utils.DefaultPeriod),
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(_ *cobra.Command, _ []string) {
