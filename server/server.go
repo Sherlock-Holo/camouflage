@@ -27,40 +27,6 @@ type Server struct {
 }
 
 func (s *Server) checkRequest(w http.ResponseWriter, r *http.Request) {
-	if s.enableWebCertificate() {
-		switch r.Host {
-		case s.config.WebHost:
-			s.webHandle(w, r)
-			return
-
-		case s.config.Host:
-			if !websocket.IsWebSocketUpgrade(r) {
-				http.Error(w, "Forbidden", http.StatusForbidden)
-				return
-			}
-
-			code := r.Header.Get("totp-code")
-			ok, err := utils.VerifyCode(code, s.config.Secret, s.config.Period)
-			if err != nil {
-				http.Error(w, "server internal error", http.StatusInternalServerError)
-				log.Printf("verify code failed: %+v", err)
-				return
-			}
-
-			if !ok {
-				http.Error(w, "Forbidden", http.StatusForbidden)
-				return
-			}
-
-			s.proxyHandle(w, r)
-			return
-
-		default:
-			http.Error(w, "Bad Gateway", http.StatusBadGateway)
-			return
-		}
-	}
-
 	code := r.Header.Get("totp-code")
 	ok, err := utils.VerifyCode(code, s.config.Secret, s.config.Period)
 	if err != nil {
@@ -109,20 +75,6 @@ func (s *Server) proxyHandle(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-/*func (s *Server) redirect(w http.ResponseWriter, r *http.Request) {
-	webUrl := url.URL{
-		Scheme: "https",
-		Path:   r.URL.Path,
-	}
-	if strings.HasSuffix(s.config.WebHost, ":443") {
-		webUrl.Host = strings.Split(s.config.WebHost, ":")[0]
-	} else {
-		webUrl.Host = s.config.WebHost
-	}
-
-	http.Redirect(w, r, webUrl.String(), http.StatusFound)
-}*/
-
 func handle(l link.Link) {
 	address, err := libsocks.DecodeFrom(l)
 	if err != nil {
@@ -139,18 +91,12 @@ func handle(l link.Link) {
 	}
 
 	go func() {
-		/*if _, err := io.Copy(remote, l); err != nil {
-			// log.Printf("forward link data to remote server failed: %v", err)
-		}*/
 		io.Copy(remote, l)
 		l.Close()
 		remote.Close()
 	}()
 
 	go func() {
-		/*if _, err := io.Copy(l, remote); err != nil {
-			// log.Printf("forward remote server data to link failed: %v", err)
-		}*/
 		io.Copy(l, remote)
 		l.Close()
 		remote.Close()
@@ -204,16 +150,19 @@ func New(cfg *server.Config) (server *Server) {
 
 	tlsConfig.BuildNameToCertificate()
 
-	tcpListener, err := net.Listen("tcp", server.config.ListenAddr)
+	server.tlsListener, err = tls.Listen("tcp", server.config.ListenAddr, tlsConfig)
 	if err != nil {
 		log.Fatalf("listen %s failed: %+v", server.config.ListenAddr, errors.WithStack(err))
 	}
 
-	server.tlsListener = tls.NewListener(tcpListener, tlsConfig)
-
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", server.checkRequest)
+	if server.enableWebCertificate() {
+		mux.HandleFunc(server.config.Host+"/", server.proxyHandle)
+		mux.HandleFunc(server.config.WebHost+"/", server.webHandle)
+	} else {
+		mux.HandleFunc("/", server.checkRequest)
+	}
 
 	server.httpServer = http.Server{Handler: mux}
 
