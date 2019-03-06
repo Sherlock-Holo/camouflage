@@ -6,6 +6,7 @@ require (
 	github.com/Sherlock-Holo/libsocks v0.0.0-20190302141708-8ec046f65f39
 	github.com/Sherlock-Holo/link v0.6.1-0.20190302141421-0da0314aeb02
 	github.com/boombuler/barcode v1.0.0 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gorilla/websocket v1.4.0
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/pkg/errors v0.8.1
