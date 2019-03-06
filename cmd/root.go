@@ -21,7 +21,13 @@ func Execute() {
 		genTOTPSecret,
 	)
 
-	rootCmd.AddCommand(completionCmd)
+	/*if err := rootCmd.GenBashCompletionFile("bash_completion"); err != nil {
+		log.Printf("%+v", errors.WithStack(err))
+	}
+
+	if err := rootCmd.GenZshCompletionFile("zsh_completion"); err != nil {
+		log.Printf("%+v", errors.WithStack(err))
+	}*/
 
 	clientCmd.Flags().StringVarP(&clientConfig, "file", "f", "", "client config file")
 	serverCmd.Flags().StringVarP(&serverConfig, "file", "f", "", "server config file")
