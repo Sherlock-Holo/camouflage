@@ -26,10 +26,10 @@ func NewSocks(conn net.Conn) (socks *Socks, err error) {
 }
 
 func (s *Socks) Handshake(respType libsocks.ResponseType) error {
-	return xerrors.Errorf(
-		"socks handshake failed: %w",
-		s.socks.Reply(s.socks.LocalAddr().(*net.TCPAddr).IP, uint16(s.socks.LocalAddr().(*net.TCPAddr).Port), respType),
-	)
+	if err := s.socks.Reply(s.socks.LocalAddr().(*net.TCPAddr).IP, uint16(s.socks.LocalAddr().(*net.TCPAddr).Port), respType); err != nil {
+		return xerrors.Errorf("socks handshake failed: %w", err)
+	}
+	return nil
 }
 
 func (s *Socks) Target() []byte {
@@ -37,13 +37,23 @@ func (s *Socks) Target() []byte {
 }
 
 func (s *Socks) Read(p []byte) (n int, err error) {
-	return s.socks.Read(p)
+	if n, err = s.socks.Read(p); err != nil {
+		err = xerrors.Errorf("socks read failed: %w", err)
+	}
+	return
 }
 
 func (s *Socks) Write(p []byte) (n int, err error) {
-	return s.socks.Write(p)
+	// return s.socks.Write(p)
+	if n, err = s.socks.Write(p); err != nil {
+		err = xerrors.Errorf("socks write failed: %w", err)
+	}
+	return
 }
 
 func (s *Socks) Close() error {
-	return s.socks.Close()
+	if err := s.socks.Close(); err != nil {
+		return xerrors.Errorf("socks close failed: %w", err)
+	}
+	return nil
 }

@@ -144,7 +144,7 @@ func (c *Client) reconnect() (err error) {
 
 			if resp.StatusCode == http.StatusForbidden {
 				if i == 1 {
-					return xerrors.New("maybe TOTP secret is wrong")
+					return xerrors.New("reconnect failed: maybe TOTP secret is wrong")
 				} else {
 					continue
 				}
@@ -168,7 +168,7 @@ func (c *Client) reconnect() (err error) {
 func (c *Client) handle(conn net.Conn) {
 	socks, err := NewSocks(conn)
 	if err != nil {
-		log.Printf("%v", err)
+		log.Printf("%v", xerrors.Errorf("client handle error: %w", err))
 		return
 	}
 
@@ -197,7 +197,7 @@ func (c *Client) handle(conn net.Conn) {
 
 	select {
 	case err := <-connReq.Err:
-		log.Printf("dial link failed: %+v", err)
+		log.Printf("client handle error: %+v", err)
 
 		switch {
 		case xerrors.Is(err, link.ErrTimeout):
@@ -215,7 +215,7 @@ func (c *Client) handle(conn net.Conn) {
 
 	case l = <-connReq.Success:
 		if err := socks.Handshake(libsocks.Success); err != nil {
-			log.Printf("socks handshake failed: %+v", err)
+			log.Printf("%+v", xerrors.Errorf("client handle error: %w", err))
 			socks.Close()
 			l.Close()
 			return

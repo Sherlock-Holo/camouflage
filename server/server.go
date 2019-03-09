@@ -34,7 +34,8 @@ func (s *Server) checkRequest(w http.ResponseWriter, r *http.Request) {
 	ok, err := utils.VerifyCode(code, s.config.Secret, s.config.Period)
 	if err != nil {
 		http.Error(w, "server internal error", http.StatusInternalServerError)
-		log.Printf("verify code failed: %+v", err)
+		// log.Printf("verify code failed: %+v", err)
+		log.Printf("%+v", xerrors.Errorf("verify code error: %w", err))
 		return
 	}
 
@@ -79,16 +80,16 @@ func (s *Server) proxyHandle(w http.ResponseWriter, r *http.Request) {
 }
 
 func handle(l link.Link) {
-	address, err := libsocks.DecodeFrom(l)
+	address, err := libsocks.UnmarshalAddressFrom(l)
 	if err != nil {
-		log.Printf("%+v", xerrors.Errorf("decode socks failed: %w", err))
+		log.Printf("%+v", xerrors.Errorf("server unmarshal address failed: %w", err))
 		l.Close()
 		return
 	}
 
 	remote, err := net.Dial("tcp", address.String())
 	if err != nil {
-		log.Printf("%+v", xerrors.Errorf("connect target failed: %w", err))
+		log.Printf("%+v", xerrors.Errorf("server connect target failed: %w", err))
 		l.Close()
 		return
 	}
@@ -138,21 +139,6 @@ func New(cfg *server.Config) (server *Server) {
 		PreferServerCipherSuites: true,
 		NextProtos:               []string{"h2"},
 		MinVersion:               tls.VersionTLS12,
-
-		// follow https://blog.gopheracademy.com/advent-2016/exposing-go-on-the-internet/ to optimize server
-		// Only use curves which have assembly implementations
-		CurvePreferences: []tls.CurveID{
-			tls.CurveP256,
-			tls.X25519,
-		},
-		CipherSuites: []uint16{
-			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
-			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-		},
 	}
 
 	// load server certificate

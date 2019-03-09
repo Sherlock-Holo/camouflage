@@ -42,7 +42,11 @@ func VerifyCode(code, secret string, period uint) (ok bool, err error) {
 		Digits:    digits,
 		Period:    period,
 	})
-	return ok, xerrors.Errorf("verify TOTP code failed: %w", err)
+	if err != nil {
+		return false, xerrors.Errorf("verify TOTP code failed: %w", err)
+	}
+
+	return ok, nil
 }
 
 func GenCode(secret string, period uint) (code string, err error) {
@@ -51,5 +55,9 @@ func GenCode(secret string, period uint) (code string, err error) {
 		Digits:    digits,
 		Period:    period,
 	})
-	return code, xerrors.Errorf("generate TOTP code failed: %w", err)
+	if err != nil {
+		return "", xerrors.Errorf("generate TOTP code failed: %w", err)
+	}
+
+	return code, nil
 }
