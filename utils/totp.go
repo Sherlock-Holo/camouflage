@@ -4,9 +4,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
+	"golang.org/x/xerrors"
 )
 
 const (
@@ -26,7 +26,7 @@ func GenTOTPSecret(period uint) string {
 		Period:      period,
 	})
 	if err != nil {
-		log.Fatalf("%+v", errors.Wrap(err, "generate TOTP secret failed"))
+		log.Fatalf("%+v", xerrors.Errorf("generate TOTP secret failed: %w", err))
 	}
 
 	return key.Secret()
@@ -42,7 +42,7 @@ func VerifyCode(code, secret string, period uint) (ok bool, err error) {
 		Digits:    digits,
 		Period:    period,
 	})
-	return ok, errors.Wrap(err, "verify TOTP code failed")
+	return ok, xerrors.Errorf("verify TOTP code failed: %w", err)
 }
 
 func GenCode(secret string, period uint) (code string, err error) {
@@ -51,5 +51,5 @@ func GenCode(secret string, period uint) (code string, err error) {
 		Digits:    digits,
 		Period:    period,
 	})
-	return code, errors.Wrap(err, "generate TOTP code failed")
+	return code, xerrors.Errorf("generate TOTP code failed: %w", err)
 }

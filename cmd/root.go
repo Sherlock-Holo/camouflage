@@ -4,8 +4,8 @@ import (
 	"log"
 
 	"github.com/Sherlock-Holo/camouflage/utils"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"golang.org/x/xerrors"
 )
 
 var rootCmd = &cobra.Command{
@@ -28,6 +28,6 @@ func Execute() {
 	rootCmd.InitDefaultVersionFlag()
 
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatalf("%v", errors.WithStack(err))
+		log.Fatalf("%+v", xerrors.Errorf("root cmd execute failed: %w", err))
 	}
 }

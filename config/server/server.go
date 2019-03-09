@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/pkg/errors"
+	"golang.org/x/xerrors"
 )
 
 type Duration struct {
@@ -41,7 +41,7 @@ type tomlConfig struct {
 func New(path string) (Config, error) {
 	config := new(tomlConfig)
 	if _, err := toml.DecodeFile(path, config); err != nil {
-		return Config{}, errors.WithStack(err)
+		return Config{}, xerrors.Errorf("new server config failed: %w", err)
 	}
 
 	return config.Server, nil

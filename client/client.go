@@ -18,7 +18,7 @@ import (
 	"github.com/Sherlock-Holo/libsocks"
 	"github.com/Sherlock-Holo/link"
 	"github.com/gorilla/websocket"
-	"github.com/pkg/errors"
+	"golang.org/x/xerrors"
 )
 
 type Client struct {
@@ -33,7 +33,7 @@ type Client struct {
 func New(cfg *client.Config) (*Client, error) {
 	listener, err := net.Listen("tcp", cfg.ListenAddr)
 	if err != nil {
-		log.Fatalf("local listen failed: %+v", errors.WithStack(err))
+		log.Fatalf("%+v", xerrors.Errorf("local listen failed: %w", err))
 	}
 
 	wsURL := (&url.URL{
@@ -48,7 +48,7 @@ func New(cfg *client.Config) (*Client, error) {
 
 		caBytes, err := ioutil.ReadFile(cfg.DebugCA)
 		if err != nil {
-			log.Fatalf("read ca cert failed: %+v", errors.WithStack(err))
+			log.Fatalf("%+v", xerrors.Errorf("read ca cert failed: %w", err))
 		}
 
 		certPool.AppendCertsFromPEM(caBytes)
@@ -80,7 +80,7 @@ func New(cfg *client.Config) (*Client, error) {
 func (c *Client) Run() {
 	for {
 		if err := c.reconnect(); err != nil {
-			log.Printf("connect to server failed: %v", errors.WithStack(err))
+			log.Printf("%+v", xerrors.Errorf("connect to server failed: %w", err))
 			continue
 		}
 		break
@@ -89,7 +89,7 @@ func (c *Client) Run() {
 	for {
 		conn, err := c.listener.Accept()
 		if err != nil {
-			log.Printf("accept failed: %v", errors.WithStack(err))
+			log.Printf("%v", xerrors.Errorf("accept failed: %w", err))
 			continue
 		}
 
@@ -130,7 +130,7 @@ func (c *Client) reconnect() (err error) {
 	for i := 0; i < 2; i++ {
 		code, err := utils.GenCode(c.config.Secret, c.config.Period)
 		if err != nil {
-			return errors.Wrap(err, "connect server failed")
+			return xerrors.Errorf("reconnect failed: %w", err)
 		}
 
 		httpHeader := http.Header{}
@@ -138,23 +138,23 @@ func (c *Client) reconnect() (err error) {
 
 		conn, resp, err = c.wsDialer.Dial(c.wsURL, httpHeader)
 
-		switch errors.Cause(err) {
-		case websocket.ErrBadHandshake:
+		switch {
+		case xerrors.Is(err, websocket.ErrBadHandshake):
 			resp.Body.Close()
 
 			if resp.StatusCode == http.StatusForbidden {
 				if i == 1 {
-					return errors.New("maybe TOTP secret is wrong")
+					return xerrors.New("maybe TOTP secret is wrong")
 				} else {
 					continue
 				}
 			}
-			return errors.Wrap(err, "connect server failed")
+			return xerrors.Errorf("reconnect failed: %w", err)
 
 		default:
-			return errors.Wrap(err, "connect server failed")
+			return xerrors.Errorf("reconnect failed: %w", err)
 
-		case nil:
+		case err == nil:
 		}
 	}
 
@@ -199,11 +199,11 @@ func (c *Client) handle(conn net.Conn) {
 	case err := <-connReq.Err:
 		log.Printf("dial link failed: %+v", err)
 
-		switch errors.Cause(err) {
-		case link.ErrTimeout:
+		switch {
+		case xerrors.Is(err, link.ErrTimeout):
 			socks.Handshake(libsocks.TTLExpired)
 
-		case link.ErrManagerClosed:
+		case xerrors.Is(err, link.ErrManagerClosed):
 			socks.Handshake(libsocks.NetworkUnreachable)
 
 		default:

@@ -2,10 +2,10 @@ github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/Sherlock-Holo/goutils/websocket v0.0.0-20190227124339-861fac9fe37b h1:WO/XNu6V1jzqAUnUyyf5inaoNA6fWvb1ueU5b5VXCnk=
 github.com/Sherlock-Holo/goutils/websocket v0.0.0-20190227124339-861fac9fe37b/go.mod h1:tHfa/dGMMz9AiAMpdH9U+nATBqt3gimPiEx3xZde/TI=
-github.com/Sherlock-Holo/libsocks v0.0.0-20190302141708-8ec046f65f39 h1:1zYyAeRjIYdnnFW7rU9ClM/Fl2pfAkJEXm57gECzRGA=
-github.com/Sherlock-Holo/libsocks v0.0.0-20190302141708-8ec046f65f39/go.mod h1:jaHescOvrHhc0rUymZyZPMUa8LUmJ7uXSR9og50YG0U=
-github.com/Sherlock-Holo/link v0.6.1-0.20190302141421-0da0314aeb02 h1:Q+DndABrO7cOUphNJIAiPw9oRItm+ZTI8RYn29NzJVo=
-github.com/Sherlock-Holo/link v0.6.1-0.20190302141421-0da0314aeb02/go.mod h1:9mi9XskP8AAoWgGijvPYwOirhC5raP8JYHpnXusNnzs=
+github.com/Sherlock-Holo/libsocks v0.0.0-20190309082855-6e2e1428a612 h1:7xOl2gfzqf5os+pDTkVmo3bHV3GqOgVZ2joYhIQ5XSc=
+github.com/Sherlock-Holo/libsocks v0.0.0-20190309082855-6e2e1428a612/go.mod h1:WdhDgbRNqVSn0anmmpdvybR9t27VQEiTCjyt3JPWbaU=
+github.com/Sherlock-Holo/link v0.6.1 h1:JG5VdmAIq9Wco2LJ8R2da8l+xAR4E9F/DDyJJvGQp64=
+github.com/Sherlock-Holo/link v0.6.1/go.mod h1:BFSDzgde58IooMExhtwenMlM1bDhZWfMR24GrpPZxOQ=
 github.com/akutz/memconn v0.1.0 h1:NawI0TORU4hcOMsMr11g7vwlCdkYeLKXBcxWu2W/P8A=
 github.com/akutz/memconn v0.1.0/go.mod h1:Jo8rI7m0NieZyLI5e2CDlRdRqRRB4S7Xp77ukDjH+Fw=
 github.com/boombuler/barcode v1.0.0 h1:s1TvRnXwL2xJRaccrdcBQMZxq6X7DvsMogtmJeHDdrc=
@@ -31,3 +31,5 @@ github.com/spf13/pflag v1.0.3/go.mod h1:DYY7MBk1bdzusC3SYhjObp+wFpr4gzcvqqNjLnIn
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.3.0 h1:TivCn/peBQ7UY8ooIcPgZFpTNSz0Q2U6UrFlUfqbe0Q=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
+golang.org/x/xerrors v0.0.0-20190212162355-a5947ffaace3 h1:P6iTFmrTQqWrqLZPX1VMzCUbCRCAUXSUsSpkEOvWzJ0=
+golang.org/x/xerrors v0.0.0-20190212162355-a5947ffaace3/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=

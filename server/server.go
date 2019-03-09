@@ -18,7 +18,7 @@ import (
 	"github.com/Sherlock-Holo/libsocks"
 	"github.com/Sherlock-Holo/link"
 	"github.com/gorilla/websocket"
-	"github.com/pkg/errors"
+	"golang.org/x/xerrors"
 )
 
 type Server struct {
@@ -58,7 +58,7 @@ func (s *Server) webHandle(w http.ResponseWriter, r *http.Request) {
 func (s *Server) proxyHandle(w http.ResponseWriter, r *http.Request) {
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("websocket upgrade failed: %s", errors.WithStack(err))
+		log.Printf("%+v", xerrors.Errorf("websocket upgrade failed: %w", err))
 		return
 	}
 
@@ -81,14 +81,14 @@ func (s *Server) proxyHandle(w http.ResponseWriter, r *http.Request) {
 func handle(l link.Link) {
 	address, err := libsocks.DecodeFrom(l)
 	if err != nil {
-		log.Printf("decode socks failed: %+v", errors.WithStack(err))
+		log.Printf("%+v", xerrors.Errorf("decode socks failed: %w", err))
 		l.Close()
 		return
 	}
 
 	remote, err := net.Dial("tcp", address.String())
 	if err != nil {
-		log.Printf("connect target failed: %+v", errors.WithStack(err))
+		log.Printf("%+v", xerrors.Errorf("connect target failed: %w", err))
 		l.Close()
 		return
 	}
@@ -158,7 +158,7 @@ func New(cfg *server.Config) (server *Server) {
 	// load server certificate
 	serverCertificate, err := tls.LoadX509KeyPair(server.config.Crt, server.config.Key)
 	if err != nil {
-		log.Fatalf("read server key pair failed: %+v", errors.WithStack(err))
+		log.Fatalf("%+v", xerrors.Errorf("read server key pair failed: %w", err))
 	}
 
 	tlsConfig.Certificates = append(tlsConfig.Certificates, serverCertificate)
@@ -167,7 +167,7 @@ func New(cfg *server.Config) (server *Server) {
 		// load web certificate
 		webCertificate, err := tls.LoadX509KeyPair(server.config.WebCrt, server.config.WebKey)
 		if err != nil {
-			log.Fatalf("read web key pair failed: %+v", errors.WithStack(err))
+			log.Fatalf("%+v", xerrors.Errorf("read web key pair failed: %w", err))
 		}
 		tlsConfig.Certificates = append(tlsConfig.Certificates, webCertificate)
 	}
@@ -176,7 +176,7 @@ func New(cfg *server.Config) (server *Server) {
 		// load read reverse certificate
 		reverseProxyCertificate, err := tls.LoadX509KeyPair(server.config.ReverseProxyCrt, server.config.ReverseProxyKey)
 		if err != nil {
-			log.Fatalf("read reverse proxy key pair failed: %+v", errors.WithStack(err))
+			log.Fatalf("%+v", xerrors.Errorf("read reverse proxy key pair failed: %w", err))
 		}
 		tlsConfig.Certificates = append(tlsConfig.Certificates, reverseProxyCertificate)
 	}
@@ -185,7 +185,7 @@ func New(cfg *server.Config) (server *Server) {
 
 	server.tlsListener, err = tls.Listen("tcp", server.config.ListenAddr, tlsConfig)
 	if err != nil {
-		log.Fatalf("listen %s failed: %+v", server.config.ListenAddr, errors.WithStack(err))
+		log.Fatalf("%+v", xerrors.Errorf("listen %s failed: %w", server.config.ListenAddr, err))
 	}
 
 	mux := http.NewServeMux()
@@ -205,7 +205,7 @@ func New(cfg *server.Config) (server *Server) {
 
 		u, err := url.Parse(server.config.ReverseProxyAddr)
 		if err != nil {
-			log.Fatalf("parse reverse proxy addr failed: %+v", errors.WithStack(err))
+			log.Fatalf("%+v", xerrors.Errorf("parse reverse proxy addr failed: %w", err))
 		}
 
 		proxy := httputil.NewSingleHostReverseProxy(u)

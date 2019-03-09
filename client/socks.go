@@ -4,7 +4,7 @@ import (
 	"net"
 
 	"github.com/Sherlock-Holo/libsocks"
-	"github.com/pkg/errors"
+	"golang.org/x/xerrors"
 )
 
 type Socks struct {
@@ -15,7 +15,7 @@ type Socks struct {
 func NewSocks(conn net.Conn) (socks *Socks, err error) {
 	s, err := libsocks.NewSocks(conn, nil)
 	if err != nil {
-		err = errors.Wrap(err, "new socks failed")
+		err = xerrors.Errorf("NewSocks failed: %w", err)
 		conn.Close()
 		return
 	}
@@ -26,7 +26,10 @@ func NewSocks(conn net.Conn) (socks *Socks, err error) {
 }
 
 func (s *Socks) Handshake(respType libsocks.ResponseType) error {
-	return errors.WithStack(s.socks.Reply(s.socks.LocalAddr().(*net.TCPAddr).IP, uint16(s.socks.LocalAddr().(*net.TCPAddr).Port), respType))
+	return xerrors.Errorf(
+		"socks handshake failed: %w",
+		s.socks.Reply(s.socks.LocalAddr().(*net.TCPAddr).IP, uint16(s.socks.LocalAddr().(*net.TCPAddr).Port), respType),
+	)
 }
 
 func (s *Socks) Target() []byte {
