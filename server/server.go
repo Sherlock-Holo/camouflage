@@ -178,7 +178,7 @@ func New(cfg *server.Config) (server *Server) {
 
 	if server.webCertificateIsEnabled() {
 		mux.HandleFunc(server.config.Host+"/", server.proxyHandle)
-		mux.HandleFunc(server.config.WebHost+"/", server.webHandle)
+		mux.Handle(server.config.WebHost+"/", enableGzip(http.HandlerFunc(server.webHandle)))
 	} else {
 		mux.HandleFunc(server.config.Host+"/", server.checkRequest)
 	}
