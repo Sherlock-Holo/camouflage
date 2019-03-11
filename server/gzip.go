@@ -32,11 +32,15 @@ func enableGzip(handler http.Handler) http.Handler {
 		handler.ServeHTTP(respRecorder, r)
 
 		result := respRecorder.Result()
+		defer result.Body.Close()
 
 		if result.StatusCode != http.StatusOK {
 			copyHeader(w.Header(), result.Header)
 			w.WriteHeader(result.StatusCode)
-			io.Copy(w, result.Body)
+			if _, err := io.Copy(w, result.Body); err != nil {
+				log.Printf("%+v", xerrors.Errorf("write status not OK http response failed: %w", err))
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+			}
 			return
 		}
 
@@ -80,8 +84,6 @@ func shouldCompress(req *http.Request) bool {
 	if len(extension) < 4 { // fast path
 		return true
 	}
-
-	// log.Println("extension:", extension)
 
 	switch extension {
 	case ".png", ".gif", ".jpeg", ".jpg":
