@@ -6,13 +6,13 @@ import (
 	"crypto/x509"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/Sherlock-Holo/camouflage/config/client"
+	"github.com/Sherlock-Holo/camouflage/log"
 	"github.com/Sherlock-Holo/camouflage/utils"
 	wsWrapper "github.com/Sherlock-Holo/goutils/websocket"
 	"github.com/Sherlock-Holo/libsocks"
@@ -80,7 +80,7 @@ func New(cfg *client.Config) (*Client, error) {
 func (c *Client) Run() {
 	for {
 		if err := c.reconnect(); err != nil {
-			log.Printf("%+v", xerrors.Errorf("connect to server failed: %w", err))
+			log.Warnf("%+v", xerrors.Errorf("connect to server failed: %w", err))
 			continue
 		}
 		break
@@ -89,7 +89,7 @@ func (c *Client) Run() {
 	for {
 		conn, err := c.listener.Accept()
 		if err != nil {
-			log.Printf("%v", xerrors.Errorf("accept failed: %w", err))
+			log.Errorf("%v", xerrors.Errorf("accept failed: %w", err))
 			continue
 		}
 
@@ -168,7 +168,7 @@ func (c *Client) reconnect() (err error) {
 func (c *Client) handle(conn net.Conn) {
 	socks, err := NewSocks(conn)
 	if err != nil {
-		log.Printf("%v", xerrors.Errorf("client handle error: %w", err))
+		log.Errorf("%v", xerrors.Errorf("client handle error: %w", err))
 		return
 	}
 
@@ -185,7 +185,7 @@ func (c *Client) handle(conn net.Conn) {
 
 	select {
 	case <-timeoutCtx.Done():
-		log.Printf("dial queue is full")
+		log.Warnf("dial queue is full")
 		socks.Handshake(libsocks.TTLExpired)
 		socks.Close()
 		return
@@ -197,7 +197,7 @@ func (c *Client) handle(conn net.Conn) {
 
 	select {
 	case err := <-connReq.Err:
-		log.Printf("client handle error: %+v", err)
+		log.Errorf("client handle error: %+v", err)
 
 		switch {
 		case xerrors.Is(err, link.ErrTimeout):
@@ -215,7 +215,7 @@ func (c *Client) handle(conn net.Conn) {
 
 	case l = <-connReq.Success:
 		if err := socks.Handshake(libsocks.Success); err != nil {
-			log.Printf("%+v", xerrors.Errorf("client handle error: %w", err))
+			log.Errorf("%+v", xerrors.Errorf("client handle error: %w", err))
 			socks.Close()
 			l.Close()
 			return

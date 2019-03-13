@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"crypto/x509/pkix"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Sherlock-Holo/camouflage/config/server"
+	"github.com/Sherlock-Holo/camouflage/log"
 	"github.com/Sherlock-Holo/camouflage/utils"
 	wsWrapper "github.com/Sherlock-Holo/goutils/websocket"
 	"github.com/Sherlock-Holo/libsocks"
@@ -34,8 +34,7 @@ func (s *Server) checkRequest(w http.ResponseWriter, r *http.Request) {
 	ok, err := utils.VerifyCode(code, s.config.Secret, s.config.Period)
 	if err != nil {
 		http.Error(w, "server internal error", http.StatusInternalServerError)
-		// log.Printf("verify code failed: %+v", err)
-		log.Printf("%+v", xerrors.Errorf("verify code error: %w", err))
+		log.Warnf("%+v", xerrors.Errorf("verify code error: %w", err))
 		return
 	}
 
@@ -59,7 +58,7 @@ func (s *Server) webHandle(w http.ResponseWriter, r *http.Request) {
 func (s *Server) proxyHandle(w http.ResponseWriter, r *http.Request) {
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("%+v", xerrors.Errorf("websocket upgrade failed: %w", err))
+		log.Warnf("%+v", xerrors.Errorf("websocket upgrade failed: %w", err))
 		return
 	}
 
@@ -70,7 +69,7 @@ func (s *Server) proxyHandle(w http.ResponseWriter, r *http.Request) {
 	for {
 		l, err := manager.Accept()
 		if err != nil {
-			log.Printf("manager accept failed: %v", err)
+			log.Errorf("manager accept failed: %v", err)
 			manager.Close()
 			return
 		}
@@ -82,14 +81,14 @@ func (s *Server) proxyHandle(w http.ResponseWriter, r *http.Request) {
 func handle(l link.Link) {
 	address, err := libsocks.UnmarshalAddressFrom(l)
 	if err != nil {
-		log.Printf("%+v", xerrors.Errorf("server unmarshal address failed: %w", err))
+		log.Errorf("%+v", xerrors.Errorf("server unmarshal address failed: %w", err))
 		l.Close()
 		return
 	}
 
 	remote, err := net.Dial("tcp", address.String())
 	if err != nil {
-		log.Printf("%+v", xerrors.Errorf("server connect target failed: %w", err))
+		log.Errorf("%+v", xerrors.Errorf("server connect target failed: %w", err))
 		l.Close()
 		return
 	}
@@ -111,17 +110,17 @@ func (s *Server) Run() http.Server {
 	go s.httpServer.Serve(s.tlsListener)
 
 	if s.webCertificateIsEnabled() {
-		log.Println("sni enable")
+		log.Info("sni enable")
 	}
 
 	if s.reverseProxyIsEnabled() {
-		log.Println("reverse proxy enable")
+		log.Info("reverse proxy enable")
 	}
 
 	if s.config.WebRoot != "" {
-		log.Println("web service enable, web root:", s.config.WebRoot)
+		log.Info("web service enable, web root:", s.config.WebRoot)
 	}
-	log.Println("camouflage started")
+	log.Info("camouflage started")
 
 	return s.httpServer
 }
