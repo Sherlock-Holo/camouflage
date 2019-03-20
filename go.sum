@@ -2,12 +2,8 @@ github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/Sherlock-Holo/goutils/websocket v0.0.0-20190227124339-861fac9fe37b h1:WO/XNu6V1jzqAUnUyyf5inaoNA6fWvb1ueU5b5VXCnk=
 github.com/Sherlock-Holo/goutils/websocket v0.0.0-20190227124339-861fac9fe37b/go.mod h1:tHfa/dGMMz9AiAMpdH9U+nATBqt3gimPiEx3xZde/TI=
-github.com/Sherlock-Holo/libsocks v0.0.0-20190309082855-6e2e1428a612 h1:7xOl2gfzqf5os+pDTkVmo3bHV3GqOgVZ2joYhIQ5XSc=
-github.com/Sherlock-Holo/libsocks v0.0.0-20190309082855-6e2e1428a612/go.mod h1:WdhDgbRNqVSn0anmmpdvybR9t27VQEiTCjyt3JPWbaU=
 github.com/Sherlock-Holo/libsocks v0.0.0-20190309122214-655791302806 h1:kb0cWZqH2NdEdi+A/VD+FDqjoAeaaYImpQWyWh8ZgXM=
 github.com/Sherlock-Holo/libsocks v0.0.0-20190309122214-655791302806/go.mod h1:WdhDgbRNqVSn0anmmpdvybR9t27VQEiTCjyt3JPWbaU=
-github.com/Sherlock-Holo/link v0.6.1 h1:JG5VdmAIq9Wco2LJ8R2da8l+xAR4E9F/DDyJJvGQp64=
-github.com/Sherlock-Holo/link v0.6.1/go.mod h1:BFSDzgde58IooMExhtwenMlM1bDhZWfMR24GrpPZxOQ=
 github.com/Sherlock-Holo/link v0.6.2-0.20190309121502-1ec20cdbdf62 h1:WqBkPaFErePiO3ZRMmU/nZKZ/4VyPt+tZrq14YwMTwk=
 github.com/Sherlock-Holo/link v0.6.2-0.20190309121502-1ec20cdbdf62/go.mod h1:BFSDzgde58IooMExhtwenMlM1bDhZWfMR24GrpPZxOQ=
 github.com/akutz/memconn v0.1.0 h1:NawI0TORU4hcOMsMr11g7vwlCdkYeLKXBcxWu2W/P8A=
@@ -16,8 +12,6 @@ github.com/boombuler/barcode v1.0.0 h1:s1TvRnXwL2xJRaccrdcBQMZxq6X7DvsMogtmJeHDd
 github.com/boombuler/barcode v1.0.0/go.mod h1:paBWMcWSl3LHKBqUq+rly7CNSldXjb2rDl3JlRe0mD8=
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
-github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/gorilla/websocket v1.4.0 h1:WDFjx/TMzVgy9VdMMQi2K2Emtwi2QcUQsztZ/zLaH/Q=
 github.com/gorilla/websocket v1.4.0/go.mod h1:E7qHFY5m1UJ88s3WnNqhKjPHQ0heANvMoAMk2YaljkQ=
 github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NHg9XEKhtSvM=
@@ -37,3 +31,5 @@ github.com/stretchr/testify v1.3.0 h1:TivCn/peBQ7UY8ooIcPgZFpTNSz0Q2U6UrFlUfqbe0
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 golang.org/x/xerrors v0.0.0-20190212162355-a5947ffaace3 h1:P6iTFmrTQqWrqLZPX1VMzCUbCRCAUXSUsSpkEOvWzJ0=
 golang.org/x/xerrors v0.0.0-20190212162355-a5947ffaace3/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
+golang.org/x/xerrors v0.0.0-20190315151331-d61658bd2e18 h1:1AGvnywFL1aB5KLRxyLseWJI6aSYPo3oF7HSpXdWQdU=
+golang.org/x/xerrors v0.0.0-20190315151331-d61658bd2e18/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
