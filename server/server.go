@@ -106,7 +106,7 @@ func handle(l link.Link) {
 	}()
 }
 
-func (s *Server) Run() http.Server {
+func (s *Server) Run() *http.Server {
 	go s.httpServer.Serve(s.tlsListener)
 
 	if s.webCertificateIsEnabled() {
@@ -122,7 +122,7 @@ func (s *Server) Run() http.Server {
 	}
 	log.Info("camouflage started")
 
-	return s.httpServer
+	return &s.httpServer
 }
 
 func New(cfg *server.Config) (server *Server) {
