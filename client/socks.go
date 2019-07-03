@@ -8,7 +8,7 @@ import (
 )
 
 type Socks struct {
-	socks  libsocks.Socks
+	socks  *libsocks.SocksServer
 	target []byte
 }
 

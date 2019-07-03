@@ -180,7 +180,9 @@ func (c *Client) handle(conn net.Conn) {
 
 	timeoutCtx := context.Background()
 	if c.config.Timeout.Duration > 0 {
-		timeoutCtx, _ = context.WithTimeout(context.Background(), c.config.Timeout.Duration)
+		var cancel context.CancelFunc
+		timeoutCtx, cancel = context.WithTimeout(context.Background(), c.config.Timeout.Duration)
+		defer cancel()
 	}
 
 	select {
