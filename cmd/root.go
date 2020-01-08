@@ -1,11 +1,10 @@
 package cmd
 
 import (
-	"log"
-
 	"github.com/Sherlock-Holo/camouflage/utils"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"golang.org/x/xerrors"
+	errors "golang.org/x/xerrors"
 )
 
 var rootCmd = &cobra.Command{
@@ -28,6 +27,7 @@ func Execute() {
 	rootCmd.InitDefaultVersionFlag()
 
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatalf("%+v", xerrors.Errorf("root cmd execute failed: %w", err))
+		err = errors.Errorf("root cmd execute failed: %w", err)
+		log.Fatalf("%+v", err)
 	}
 }

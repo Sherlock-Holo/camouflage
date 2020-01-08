@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"golang.org/x/xerrors"
+	errors "golang.org/x/xerrors"
 )
 
 type Duration struct {
@@ -16,7 +16,13 @@ func (d *Duration) UnmarshalText(text []byte) (err error) {
 	return
 }
 
+const (
+	TypeWebsocket = "websocket"
+	TypeQuic      = "quic"
+)
+
 type Config struct {
+	Type       string   `toml:"type"` // support websocket and quic
 	RemoteAddr string   `toml:"remote_addr"`
 	DebugCA    string   `toml:"debug_ca"`
 	ListenAddr string   `toml:"listen_addr"`
@@ -32,7 +38,14 @@ type tomlConfig struct {
 func New(path string) (Config, error) {
 	config := new(tomlConfig)
 	if _, err := toml.DecodeFile(path, config); err != nil {
-		return Config{}, xerrors.Errorf("new client config failed: %w", err)
+		return Config{}, errors.Errorf("new client config failed: %w", err)
+	}
+
+	switch config.Client.Type {
+	default:
+		return Config{}, errors.Errorf("unknown type %s", config.Client.Type)
+
+	case TypeWebsocket, TypeQuic:
 	}
 
 	return config.Client, nil

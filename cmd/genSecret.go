@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+
 	"github.com/Sherlock-Holo/camouflage/utils"
 	"github.com/spf13/cobra"
 )
@@ -13,7 +14,7 @@ var genSecret = &cobra.Command{
 	Short: fmt.Sprintf("generate TOTP secret, default period is %d", utils.DefaultPeriod),
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(_ *cobra.Command, _ []string) {
-		secret := utils.GenTOTPSecret(uint(period))
+		secret := utils.GenTOTPSecret(period)
 		fmt.Printf("Your secret is %s\nYour period is %d\n", secret, period)
 	},
 }

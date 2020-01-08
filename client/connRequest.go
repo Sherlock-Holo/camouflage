@@ -1,9 +1,11 @@
 package client
 
-import "github.com/Sherlock-Holo/link"
+import (
+	"net"
+)
 
 type connRequest struct {
-	Socks   *Socks
-	Success chan link.Link
-	Err     chan error
+	Socks *Socks
+	Conn  chan net.Conn
+	Err   chan error
 }

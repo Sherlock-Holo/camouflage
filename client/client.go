@@ -2,74 +2,65 @@ package client
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"io"
 	"io/ioutil"
 	"net"
-	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/Sherlock-Holo/camouflage/config/client"
-	"github.com/Sherlock-Holo/camouflage/log"
-	"github.com/Sherlock-Holo/camouflage/utils"
-	wsWrapper "github.com/Sherlock-Holo/goutils/websocket"
+	"github.com/Sherlock-Holo/camouflage/session"
+	wsslink "github.com/Sherlock-Holo/camouflage/session/wsslink/client"
 	"github.com/Sherlock-Holo/libsocks"
 	"github.com/Sherlock-Holo/link"
-	"github.com/gorilla/websocket"
-	"golang.org/x/xerrors"
+	log "github.com/sirupsen/logrus"
+	errors "golang.org/x/xerrors"
 )
 
 type Client struct {
 	listener    net.Listener
-	config      *client.Config
-	wsURL       string
-	wsDialer    websocket.Dialer
-	manager     link.Manager
+	session     session.Client
 	connReqChan chan *connRequest
 }
 
 func New(cfg *client.Config) (*Client, error) {
 	listener, err := net.Listen("tcp", cfg.ListenAddr)
 	if err != nil {
-		log.Fatalf("%+v", xerrors.Errorf("local listen failed: %w", err))
-	}
-
-	wsURL := (&url.URL{
-		Scheme: "wss",
-		Host:   cfg.RemoteAddr,
-	}).String()
-
-	tlsConfig := new(tls.Config)
-
-	if cfg.DebugCA != "" {
-		certPool := x509.NewCertPool()
-
-		caBytes, err := ioutil.ReadFile(cfg.DebugCA)
-		if err != nil {
-			log.Fatalf("%+v", xerrors.Errorf("read ca cert failed: %w", err))
-		}
-
-		certPool.AppendCertsFromPEM(caBytes)
-
-		tlsConfig.RootCAs = certPool
-	}
-
-	dialer := websocket.Dialer{
-		TLSClientConfig: tlsConfig,
-	}
-
-	if cfg.Timeout.Duration > 0 {
-		dialer.HandshakeTimeout = cfg.Timeout.Duration
+		err = errors.Errorf("local listen failed: %w", err)
+		log.Fatalf("%+v", err)
 	}
 
 	cl := &Client{
 		listener:    listener,
-		wsURL:       wsURL,
-		wsDialer:    dialer,
-		config:      cfg,
 		connReqChan: make(chan *connRequest, 100),
+	}
+
+	switch cfg.Type {
+	case client.TypeWebsocket:
+		var opts []wsslink.Option
+
+		if cfg.DebugCA != "" {
+			ca, err := ioutil.ReadFile(cfg.DebugCA)
+			if err != nil {
+				err = errors.Errorf("read ca cert failed: %w", err)
+				log.Fatalf("%+v", err)
+			}
+
+			opts = append(opts, wsslink.WithDebugCA(ca))
+		}
+
+		if cfg.Timeout.Duration > 0 {
+			opts = append(opts, wsslink.WithHandshakeTimeout(cfg.Timeout.Duration))
+		}
+
+		wsURL := (&url.URL{
+			Scheme: "wss",
+			Host:   cfg.RemoteAddr,
+		}).String()
+
+		cl.session = wsslink.NewWssLink(wsURL, cfg.Secret, cfg.Period, opts...)
+
+	case client.TypeQuic:
+		panic("TODO")
 	}
 
 	go cl.managerLoop()
@@ -79,17 +70,10 @@ func New(cfg *client.Config) (*Client, error) {
 
 func (c *Client) Run() {
 	for {
-		if err := c.reconnect(); err != nil {
-			log.Warnf("%+v", xerrors.Errorf("connect to server failed: %w", err))
-			continue
-		}
-		break
-	}
-
-	for {
 		conn, err := c.listener.Accept()
 		if err != nil {
-			log.Errorf("%v", xerrors.Errorf("accept failed: %w", err))
+			err = errors.Errorf("accept failed: %w", err)
+			log.Errorf("%v", err)
 			continue
 		}
 
@@ -99,140 +83,80 @@ func (c *Client) Run() {
 
 func (c *Client) managerLoop() {
 	for connReq := range c.connReqChan {
-		socks := connReq.Socks
-
-		if c.manager.IsClosed() {
-			if err := c.reconnect(); err != nil {
-				connReq.Err <- err
-				continue
-			}
-		}
-
-		l, err := c.manager.DialData(utils.TimeoutCtx(c.config.Timeout.Duration), socks.Target())
+		conn, err := c.session.OpenConn(context.Background())
 		if err != nil {
+			err = errors.Errorf("session open connection failed: %w", err)
 			connReq.Err <- err
 			continue
 		}
 
-		connReq.Success <- l
+		connReq.Conn <- conn
 	}
 }
 
-func (c *Client) reconnect() (err error) {
-	if c.manager != nil {
-		c.manager.Close()
-	}
-
-	var (
-		conn *websocket.Conn
-		resp *http.Response
-	)
-	for i := 0; i < 2; i++ {
-		code, err := utils.GenCode(c.config.Secret, c.config.Period)
-		if err != nil {
-			return xerrors.Errorf("reconnect failed: %w", err)
-		}
-
-		httpHeader := http.Header{}
-		httpHeader.Set("totp-code", code)
-
-		conn, resp, err = c.wsDialer.Dial(c.wsURL, httpHeader)
-
-		switch {
-		case xerrors.Is(err, websocket.ErrBadHandshake):
-			resp.Body.Close()
-
-			if resp.StatusCode == http.StatusForbidden {
-				if i == 1 {
-					return xerrors.New("reconnect failed: maybe TOTP secret is wrong")
-				} else {
-					continue
-				}
-			}
-			return xerrors.Errorf("reconnect failed: %w", err)
-
-		default:
-			return xerrors.Errorf("reconnect failed: %w", err)
-
-		case err == nil:
-		}
-	}
-
-	linkCfg := link.DefaultConfig(link.ClientMode)
-	linkCfg.KeepaliveInterval = 5 * time.Second
-
-	c.manager = link.NewManager(wsWrapper.NewWrapper(conn), linkCfg)
-	return nil
-}
-
-func (c *Client) handle(conn net.Conn) {
-	socks, err := NewSocks(conn)
+func (c *Client) handle(socksConn net.Conn) {
+	socks, err := NewSocks(socksConn)
 	if err != nil {
-		log.Errorf("%v", xerrors.Errorf("client handle error: %w", err))
+		err = errors.Errorf("client handle error: %w", err)
+		log.Errorf("%v", err)
 		return
 	}
 
 	connReq := &connRequest{
-		Socks:   socks,
-		Success: make(chan link.Link, 1),
-		Err:     make(chan error, 1),
-	}
-
-	timeoutCtx := context.Background()
-	if c.config.Timeout.Duration > 0 {
-		var cancel context.CancelFunc
-		timeoutCtx, cancel = context.WithTimeout(context.Background(), c.config.Timeout.Duration)
-		defer cancel()
+		Socks: socks,
+		Conn:  make(chan net.Conn, 1),
+		Err:   make(chan error, 1),
 	}
 
 	select {
-	case <-timeoutCtx.Done():
-		log.Warnf("dial queue is full")
-		socks.Handshake(libsocks.TTLExpired)
+	default:
+		log.Warn("dial queue is full")
+		_ = socks.Handshake(libsocks.TTLExpired)
 		socks.Close()
 		return
 
 	case c.connReqChan <- connReq:
 	}
 
-	var l link.Link
+	var sessionConn net.Conn
 
 	select {
 	case err := <-connReq.Err:
 		log.Errorf("client handle error: %+v", err)
 
 		switch {
-		case xerrors.Is(err, link.ErrTimeout):
-			socks.Handshake(libsocks.TTLExpired)
+		case errors.Is(err, link.ErrTimeout):
+			_ = socks.Handshake(libsocks.TTLExpired)
 
-		case xerrors.Is(err, link.ErrManagerClosed):
-			socks.Handshake(libsocks.NetworkUnreachable)
+		case errors.Is(err, link.ErrManagerClosed):
+			_ = socks.Handshake(libsocks.NetworkUnreachable)
 
 		default:
-			socks.Handshake(libsocks.ServerFailed)
+			_ = socks.Handshake(libsocks.ServerFailed)
 		}
 
 		socks.Close()
 		return
 
-	case l = <-connReq.Success:
+	case sessionConn = <-connReq.Conn:
 		if err := socks.Handshake(libsocks.Success); err != nil {
-			log.Errorf("%+v", xerrors.Errorf("client handle error: %w", err))
+			err := errors.Errorf("client handle error: %w", err)
+			log.Errorf("%+v", err)
 			socks.Close()
-			l.Close()
+			sessionConn.Close()
 			return
 		}
 	}
 
 	go func() {
-		io.Copy(l, socks)
+		_, _ = io.Copy(sessionConn, socks)
 		socks.Close()
-		l.Close()
+		sessionConn.Close()
 	}()
 
 	go func() {
-		io.Copy(socks, l)
+		_, _ = io.Copy(socks, sessionConn)
 		socks.Close()
-		l.Close()
+		sessionConn.Close()
 	}()
 }

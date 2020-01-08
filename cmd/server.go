@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"log"
-
 	config "github.com/Sherlock-Holo/camouflage/config/server"
 	"github.com/Sherlock-Holo/camouflage/server"
 	"github.com/spf13/cobra"
@@ -14,14 +12,19 @@ var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "server mode",
 	Args:  cobra.NoArgs,
-	Run: func(_ *cobra.Command, _ []string) {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		cfg, err := config.New(serverConfig)
 		if err != nil {
-			log.Fatalf("%v", err)
+			return err
 		}
 
-		server := server.New(&cfg)
+		server, err := server.New(&cfg)
+		if err != nil {
+			return err
+		}
+
 		server.Run()
-		<-make(chan struct{})
+
+		return nil
 	},
 }

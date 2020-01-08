@@ -9,7 +9,8 @@ require (
 	github.com/Sherlock-Holo/link v0.6.2-0.20190309121502-1ec20cdbdf62
 	github.com/gorilla/websocket v1.4.1
 	github.com/pquerna/otp v1.2.0
+	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/cobra v0.0.5
-	github.com/spf13/pflag v1.0.5 // indirect
-	golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7
+	go.uber.org/atomic v1.5.1
+	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543
 )

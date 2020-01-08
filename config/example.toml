@@ -1,4 +1,6 @@
 [client]
+type = "websocket"
+
 remote_addr = "camouflage.example.com:9876"
 
 # set a ca to debug camouflage, non-recommand use in product server (optional)
@@ -15,7 +17,10 @@ period = 60
 
 
 [server]
+type = "websocket"
+
 host = "camouflage.example.com"
+path = "/"
 
 listen_addr = "127.0.0.1:9876"
 

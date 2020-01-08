@@ -8,8 +8,7 @@ import (
 )
 
 type Socks struct {
-	socks  *libsocks.SocksServer
-	target []byte
+	socks *libsocks.SocksServer
 }
 
 func NewSocks(conn net.Conn) (socks *Socks, err error) {

@@ -16,8 +16,15 @@ func (d *Duration) UnmarshalText(text []byte) (err error) {
 	return
 }
 
+const (
+	TypeWebsocket = "websocket"
+	TypeQuic      = "quic"
+)
+
 type Config struct {
+	Type             string   `toml:"type"` // support websocket and quic
 	Host             string   `toml:"host"`
+	Path             string   `toml:"path"`
 	ListenAddr       string   `toml:"listen_addr"`
 	Key              string   `toml:"key"`
 	Crt              string   `toml:"crt"`
