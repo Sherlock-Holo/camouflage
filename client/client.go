@@ -6,12 +6,12 @@ import (
 	"io/ioutil"
 	"net"
 	"net/url"
+	"time"
 
 	"github.com/Sherlock-Holo/camouflage/config/client"
 	"github.com/Sherlock-Holo/camouflage/session"
 	wsslink "github.com/Sherlock-Holo/camouflage/session/wsslink/client"
 	"github.com/Sherlock-Holo/libsocks"
-	"github.com/Sherlock-Holo/link"
 	log "github.com/sirupsen/logrus"
 	errors "golang.org/x/xerrors"
 )
@@ -54,7 +54,8 @@ func New(cfg *client.Config) (*Client, error) {
 
 		wsURL := (&url.URL{
 			Scheme: "wss",
-			Host:   cfg.RemoteAddr,
+			Host:   cfg.Host,
+			Path:   cfg.Path,
 		}).String()
 
 		cl.session = wsslink.NewWssLink(wsURL, cfg.Secret, cfg.Period, opts...)
@@ -63,27 +64,31 @@ func New(cfg *client.Config) (*Client, error) {
 		panic("TODO")
 	}
 
-	go cl.managerLoop()
-
 	return cl, nil
 }
 
 func (c *Client) Run() {
+	go c.acceptConnReq()
+
 	for {
-		conn, err := c.listener.Accept()
+		socksConn, err := c.listener.Accept()
 		if err != nil {
-			err = errors.Errorf("accept failed: %w", err)
+			err = errors.Errorf("accept socks failed: %w", err)
 			log.Errorf("%v", err)
 			continue
 		}
 
-		go c.handle(conn)
+		log.Debugf("accept from %s", socksConn.RemoteAddr())
+
+		go c.handle(socksConn)
 	}
 }
 
-func (c *Client) managerLoop() {
+func (c *Client) acceptConnReq() {
 	for connReq := range c.connReqChan {
-		conn, err := c.session.OpenConn(context.Background())
+		ctx := context.WithValue(context.Background(), "pre-data", connReq.Socks.Target())
+
+		conn, err := c.session.OpenConn(ctx)
 		if err != nil {
 			err = errors.Errorf("session open connection failed: %w", err)
 			connReq.Err <- err
@@ -121,24 +126,30 @@ func (c *Client) handle(socksConn net.Conn) {
 	var sessionConn net.Conn
 
 	select {
+	case <-time.After(30 * time.Second):
+		log.Error("client handle timeout")
+
+		_ = socks.Handshake(libsocks.TTLExpired)
+		_ = socks.Close()
+
+		return
+
 	case err := <-connReq.Err:
 		log.Errorf("client handle error: %+v", err)
 
-		switch {
-		case errors.Is(err, link.ErrTimeout):
+		var netErr net.Error
+		if errors.As(err, &netErr) && netErr.Timeout() {
 			_ = socks.Handshake(libsocks.TTLExpired)
-
-		case errors.Is(err, link.ErrManagerClosed):
-			_ = socks.Handshake(libsocks.NetworkUnreachable)
-
-		default:
+		} else {
 			_ = socks.Handshake(libsocks.ServerFailed)
 		}
 
-		socks.Close()
+		_ = socks.Close()
 		return
 
 	case sessionConn = <-connReq.Conn:
+		log.Debug("start socks handshake")
+
 		if err := socks.Handshake(libsocks.Success); err != nil {
 			err := errors.Errorf("client handle error: %w", err)
 			log.Errorf("%+v", err)
@@ -146,6 +157,8 @@ func (c *Client) handle(socksConn net.Conn) {
 			sessionConn.Close()
 			return
 		}
+
+		log.Debug("socks handshake success")
 	}
 
 	go func() {

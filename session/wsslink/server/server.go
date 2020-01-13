@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
-	"path"
 	"sync"
 	"time"
 
@@ -42,8 +41,6 @@ type wssLink struct {
 	tlsConfig   *tls.Config
 	tlsListener net.Listener
 
-	//crl *pkix.CertificateList
-
 	secret string
 	period uint
 
@@ -51,6 +48,8 @@ type wssLink struct {
 	linkManagerMap   sync.Map
 
 	acceptChan chan net.Conn
+
+	startOnce sync.Once
 }
 
 func NewWssLink(listenAddr, host, wsPath, secret string, period uint, serverCert tls.Certificate, opts ...Option) (*wssLink, error) {
@@ -75,7 +74,7 @@ func NewWssLink(listenAddr, host, wsPath, secret string, period uint, serverCert
 
 	wl.httpMux = http.NewServeMux()
 
-	wl.httpMux.Handle(path.Join(host, wsPath), http.HandlerFunc(wl.wsHandle))
+	wl.httpMux.Handle(host+wsPath, http.HandlerFunc(wl.wsHandle))
 
 	for _, opt := range opts {
 		opt.apply(wl)
@@ -91,10 +90,6 @@ func NewWssLink(listenAddr, host, wsPath, secret string, period uint, serverCert
 	}
 
 	wl.tlsListener = tlsListener
-
-	go func() {
-		_ = wl.httpServer.Serve(wl.tlsListener)
-	}()
 
 	return wl, nil
 }
@@ -121,6 +116,13 @@ func (w *wssLink) Close() error {
 }
 
 func (w *wssLink) AcceptConn(ctx context.Context) (net.Conn, error) {
+	// lazy start
+	w.startOnce.Do(func() {
+		go func() {
+			_ = w.httpServer.Serve(w.tlsListener)
+		}()
+	})
+
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -171,19 +173,22 @@ func (w *wssLink) wsHandle(writer http.ResponseWriter, request *http.Request) {
 			w.linkManagerMap.Delete(linkManagerId)
 		}()
 
-		linkConn, err := manager.Accept()
-		if err != nil {
-			err = errors.Errorf("accept wss link failed: %w", err)
-			log.Errorf("%+v", err)
-		}
+		for {
+			linkConn, err := manager.Accept()
+			if err != nil {
+				err = errors.Errorf("accept wss link failed: %w", err)
+				log.Errorf("%+v", err)
+				return
+			}
 
-		select {
-		default:
-			log.Warn("accept queue is full")
+			select {
+			default:
+				log.Warn("accept queue is full")
 
-			_ = linkConn.Close()
+				_ = linkConn.Close()
 
-		case w.acceptChan <- linkConn:
+			case w.acceptChan <- linkConn:
+			}
 		}
 	}()
 }

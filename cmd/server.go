@@ -3,6 +3,7 @@ package cmd
 import (
 	config "github.com/Sherlock-Holo/camouflage/config/server"
 	"github.com/Sherlock-Holo/camouflage/server"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -13,6 +14,10 @@ var serverCmd = &cobra.Command{
 	Short: "server mode",
 	Args:  cobra.NoArgs,
 	RunE: func(_ *cobra.Command, _ []string) error {
+		if debug {
+			log.SetLevel(log.DebugLevel)
+		}
+
 		cfg, err := config.New(serverConfig)
 		if err != nil {
 			return err

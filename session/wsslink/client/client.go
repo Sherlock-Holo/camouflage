@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"net"
 	"net/http"
 	"sync"
@@ -12,6 +13,7 @@ import (
 	wsWrapper "github.com/Sherlock-Holo/goutils/websocket"
 	"github.com/Sherlock-Holo/link"
 	"github.com/gorilla/websocket"
+	log "github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
 	errors "golang.org/x/xerrors"
 )
@@ -23,6 +25,10 @@ type Option interface {
 type debugCA []byte
 
 func (d debugCA) apply(link *wssLink) {
+	if link.wsDialer.TLSClientConfig.RootCAs == nil {
+		link.wsDialer.TLSClientConfig.RootCAs = x509.NewCertPool()
+	}
+
 	link.wsDialer.TLSClientConfig.RootCAs.AppendCertsFromPEM(d)
 }
 
@@ -49,8 +55,7 @@ type wssLink struct {
 
 	manager      link.Manager
 	connectMutex sync.Mutex
-	errHappened  *atomic.Bool
-	closed       *atomic.Bool
+	closed       atomic.Bool
 }
 
 func (w *wssLink) Name() string {
@@ -66,9 +71,6 @@ func NewWssLink(wsURL, totpSecret string, totpPeriod uint, opts ...Option) *wssL
 
 		secret: totpSecret,
 		period: totpPeriod,
-
-		errHappened: atomic.NewBool(true), // link manager not init, need init in connect()
-		closed:      atomic.NewBool(false),
 	}
 
 	for _, opt := range opts {
@@ -85,7 +87,7 @@ func (w *wssLink) Close() error {
 }
 
 func (w *wssLink) OpenConn(ctx context.Context) (net.Conn, error) {
-	if !w.closed.Load() {
+	if w.closed.Load() {
 		return nil, &net.OpError{
 			Op:  "open",
 			Net: w.Name(),
@@ -93,52 +95,58 @@ func (w *wssLink) OpenConn(ctx context.Context) (net.Conn, error) {
 		}
 	}
 
-	if err := w.connect(ctx); err != nil {
-		return nil, errors.Errorf("connect %s server failed: %w", w.Name(), err)
-	}
-
-	switch preData := ctx.Value("pre-data").(type) {
-	case nil:
-		conn, err := w.manager.Dial(ctx)
-		if err != nil {
-			return nil, errors.Errorf("dial wsslink failed: %w", err)
-		}
-
-		return &connection{
-			Conn:        conn,
-			errHappened: w.errHappened,
-		}, nil
-
-	case []byte:
-		conn, err := w.manager.DialData(ctx, preData)
-		if err != nil {
-			return nil, errors.Errorf("dial wsslink failed: %w", err)
-		}
-
-		return &connection{
-			Conn:        conn,
-			errHappened: w.errHappened,
-		}, nil
-
-	default:
-		return nil, errors.New("invalid pre-data")
-	}
-}
-
-// lazy init, until OpenConn called, won't dial websocket
-func (w *wssLink) connect(ctx context.Context) error {
-	// quick path
-	if !w.errHappened.Load() {
-		return nil
-	}
-
 	w.connectMutex.Lock()
 	defer w.connectMutex.Unlock()
 
-	if !w.errHappened.Load() {
-		return nil
+	if w.manager == nil {
+		for {
+			err := w.reconnect(ctx)
+			switch {
+			case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+				netErr := &net.OpError{
+					Op:  "open",
+					Net: w.Name(),
+					Err: err,
+				}
+
+				return nil, errors.Errorf("connect wss link failed: %w", netErr)
+
+			default:
+				continue
+
+			case err == nil:
+			}
+
+			log.Debug("wss link connect success")
+			break
+		}
 	}
 
+	if w.manager.IsClosed() {
+		if err := w.reconnect(ctx); err != nil {
+			return nil, errors.Errorf("reconnect wss link failed: %w", err)
+		}
+	}
+
+	if raw := ctx.Value("pre-data"); raw != nil {
+		preData, ok := raw.([]byte)
+		if !ok {
+			return nil, &net.OpError{
+				Op:  "open",
+				Net: w.Name(),
+				Err: errors.New("invalid pre-data"),
+			}
+		}
+
+		log.Debug("dial data")
+		return w.manager.DialData(ctx, preData)
+	}
+
+	return w.manager.Dial(ctx)
+}
+
+// lazy init, until OpenConn called, won't dial websocket
+func (w *wssLink) reconnect(ctx context.Context) error {
 	if w.manager != nil {
 		_ = w.manager.Close()
 	}
@@ -177,8 +185,6 @@ func (w *wssLink) connect(ctx context.Context) error {
 		linkCfg.KeepaliveInterval = 5 * time.Second
 
 		w.manager = link.NewManager(wsWrapper.NewWrapper(conn), linkCfg)
-
-		w.errHappened.Store(false)
 
 		return nil
 	}

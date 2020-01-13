@@ -178,6 +178,8 @@ func handle(conn net.Conn) {
 		return
 	}
 
+	log.Debug("start proxy")
+
 	go func() {
 		_, _ = io.Copy(remote, conn)
 		conn.Close()
@@ -193,7 +195,7 @@ func handle(conn net.Conn) {
 
 func (s *Server) Run() {
 	for {
-		conn, err := s.session.AcceptConn(context.TODO())
+		conn, err := s.session.AcceptConn(context.Background())
 		if err != nil {
 			err = errors.Errorf("accept connection failed: %w", err)
 			log.Errorf("%+v", err)

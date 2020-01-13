@@ -13,6 +13,8 @@ var rootCmd = &cobra.Command{
 	Version: version,
 }
 
+var debug bool
+
 func Execute() {
 	rootCmd.AddCommand(
 		clientCmd,
@@ -22,7 +24,11 @@ func Execute() {
 
 	clientCmd.Flags().StringVarP(&clientConfig, "file", "f", "", "client config file")
 	serverCmd.Flags().StringVarP(&serverConfig, "file", "f", "", "server config file")
+
 	genSecret.Flags().UintVarP(&period, "period", "p", utils.DefaultPeriod, "TOTP period")
+
+	clientCmd.Flags().BoolVar(&debug, "debug", false, "debug log")
+	serverCmd.Flags().BoolVar(&debug, "debug", false, "debug log")
 
 	rootCmd.InitDefaultVersionFlag()
 

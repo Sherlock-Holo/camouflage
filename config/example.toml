@@ -1,7 +1,8 @@
 [client]
 type = "websocket"
 
-remote_addr = "camouflage.example.com:9876"
+host = "camouflage.example.com:9876"
+path = "/"
 
 # set a ca to debug camouflage, non-recommand use in product server (optional)
 debug_ca = "script/ca/ca.crt"

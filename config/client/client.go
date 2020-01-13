@@ -23,7 +23,8 @@ const (
 
 type Config struct {
 	Type       string   `toml:"type"` // support websocket and quic
-	RemoteAddr string   `toml:"remote_addr"`
+	Host       string   `toml:"host"`
+	Path       string   `toml:"path"`
 	DebugCA    string   `toml:"debug_ca"`
 	ListenAddr string   `toml:"listen_addr"`
 	Timeout    Duration `toml:"timeout"`
