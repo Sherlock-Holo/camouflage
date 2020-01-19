@@ -81,7 +81,9 @@ func NewWssLink(wsURL, totpSecret string, totpPeriod uint, opts ...Option) *wssL
 }
 
 func (w *wssLink) Close() error {
-	w.closed.Store(true)
+	if w.closed.CAS(false, true) {
+		return w.manager.Close()
+	}
 
 	return nil
 }
@@ -154,7 +156,7 @@ func (w *wssLink) reconnect(ctx context.Context) error {
 	for i := 0; i < 2; i++ {
 		code, err := utils.GenCode(w.secret, w.period)
 		if err != nil {
-			return errors.Errorf("connect failed: %w", err)
+			return errors.Errorf("generate TOTP code failed: %w", err)
 		}
 
 		httpHeader := http.Header{}
