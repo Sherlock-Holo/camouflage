@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"math"
 	"net"
 	"sync"
 	"time"
@@ -133,8 +134,19 @@ func (q *quicClient) OpenConn(ctx context.Context) (net.Conn, error) {
 	)
 
 	for i := 0; i < 2; i++ {
-		stream, err = q.quicSession.OpenStream()
+		stream, err = q.quicSession.OpenStreamSync(ctx)
 		if err != nil {
+			// hack
+			if quicSession.NoRecentNetwork(err) {
+				log.Debug("session has no recent network, need reconnect")
+
+				if err := q.reconnect(ctx); err != nil {
+					return nil, errors.Errorf("reconnect quic failed: %w", err)
+				}
+
+				continue
+			}
+
 			return nil, errors.Errorf("open quic stream failed: %w", err)
 		}
 
@@ -152,12 +164,23 @@ func (q *quicClient) OpenConn(ctx context.Context) (net.Conn, error) {
 		codeBuf.Reset()
 
 		if _, err := stream.Write(codeBytes); err != nil {
+			// hack, no more hack after this write
+			if quicSession.NoRecentNetwork(err) {
+				log.Debug("session has no recent network, need reconnect")
+
+				if err := q.reconnect(ctx); err != nil {
+					return nil, errors.Errorf("reconnect quic failed: %w", err)
+				}
+
+				continue
+			}
+
 			return nil, errors.Errorf("send TOTP code failed: %w", err)
 		}
 
 		log.Debug("write handshake success")
 
-		if err := stream.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
+		if err := stream.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
 			return nil, errors.Errorf("set read deadline failed: %w", err)
 		}
 
@@ -208,7 +231,8 @@ func (q *quicClient) reconnect(ctx context.Context) error {
 	}
 
 	session, err := quic.DialAddrContext(ctx, q.addr, q.tlsConfig, &quic.Config{
-		KeepAlive: true,
+		KeepAlive:          true,
+		MaxIncomingStreams: math.MaxInt32,
 	})
 
 	if err != nil {

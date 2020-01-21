@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"io"
+	"math"
 	"net"
 	"sync"
 
@@ -59,7 +60,8 @@ func NewServer(listenAddr, secret string, period uint, serverCert tls.Certificat
 	server.tlsConfig.BuildNameToCertificate()
 
 	listener, err := quic.ListenAddr(listenAddr, server.tlsConfig, &quic.Config{
-		KeepAlive: true,
+		KeepAlive:          true,
+		MaxIncomingStreams: math.MaxInt32,
 	})
 
 	if err != nil {
@@ -194,8 +196,20 @@ func (q *quicServer) handleSession(id uint64, session quic.Session) {
 
 	for {
 		stream, err := session.AcceptStream(context.Background())
+		if err != nil {
+			// hack
+			if quicSession.NoRecentNetwork(err) {
+				log.Debug("session has no recent network, close it")
+				return
+			}
 
-		var netErr net.Error
+			err = errors.Errorf("accept quic stream failed: %w", err)
+			log.Errorf("%+v", err)
+
+			return
+		}
+
+		/*var netErr net.Error
 
 		switch {
 		case errors.As(err, &netErr) && (netErr.Temporary() || netErr.Timeout()):
@@ -209,7 +223,7 @@ func (q *quicServer) handleSession(id uint64, session quic.Session) {
 			return
 
 		case err == nil:
-		}
+		}*/
 
 		log.Debug("accept stream")
 
