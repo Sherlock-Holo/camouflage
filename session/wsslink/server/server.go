@@ -50,9 +50,10 @@ type wssLink struct {
 	acceptChan chan net.Conn
 
 	startOnce sync.Once
+	closed    atomic.Bool
 }
 
-func NewWssLink(listenAddr, host, wsPath, secret string, period uint, serverCert tls.Certificate, opts ...Option) (*wssLink, error) {
+func NewServer(listenAddr, host, wsPath, secret string, period uint, serverCert tls.Certificate, opts ...Option) (*wssLink, error) {
 	wl := &wssLink{
 		host: host,
 
@@ -60,6 +61,7 @@ func NewWssLink(listenAddr, host, wsPath, secret string, period uint, serverCert
 			PreferServerCipherSuites: true,
 			NextProtos:               []string{"h2"},
 			MinVersion:               tls.VersionTLS12,
+			Certificates:             []tls.Certificate{serverCert},
 		},
 
 		secret: secret,
@@ -69,8 +71,6 @@ func NewWssLink(listenAddr, host, wsPath, secret string, period uint, serverCert
 
 		acceptChan: make(chan net.Conn, 100),
 	}
-
-	wl.tlsConfig.Certificates = append(wl.tlsConfig.Certificates, serverCert)
 
 	wl.httpMux = http.NewServeMux()
 
@@ -99,18 +99,20 @@ func (w *wssLink) Name() string {
 }
 
 func (w *wssLink) Close() error {
-	timeout, cancelFunc := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancelFunc()
+	if w.closed.CAS(false, true) {
+		timeout, cancelFunc := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancelFunc()
 
-	_ = w.httpServer.Shutdown(timeout)
+		_ = w.httpServer.Shutdown(timeout)
 
-	w.linkManagerMap.Range(func(_, value interface{}) bool {
-		_ = value.(link.Manager).Close()
+		w.linkManagerMap.Range(func(_, value interface{}) bool {
+			_ = value.(link.Manager).Close()
 
-		return true
-	})
+			return true
+		})
 
-	_ = w.httpServer.Close()
+		_ = w.httpServer.Close()
+	}
 
 	return nil
 }
@@ -122,6 +124,14 @@ func (w *wssLink) AcceptConn(ctx context.Context) (net.Conn, error) {
 			_ = w.httpServer.Serve(w.tlsListener)
 		}()
 	})
+
+	if w.closed.Load() {
+		return nil, &net.OpError{
+			Op:  "open",
+			Net: w.Name(),
+			Err: errors.New("wss link is closed"),
+		}
+	}
 
 	select {
 	case <-ctx.Done():

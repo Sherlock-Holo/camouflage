@@ -62,7 +62,7 @@ func (w *wssLink) Name() string {
 	return "wsslink"
 }
 
-func NewWssLink(wsURL, totpSecret string, totpPeriod uint, opts ...Option) *wssLink {
+func NewClient(wsURL, totpSecret string, totpPeriod uint, opts ...Option) *wssLink {
 	wl := &wssLink{
 		wsURL: wsURL,
 		wsDialer: websocket.Dialer{

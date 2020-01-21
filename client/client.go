@@ -10,6 +10,7 @@ import (
 
 	"github.com/Sherlock-Holo/camouflage/config/client"
 	"github.com/Sherlock-Holo/camouflage/session"
+	quic "github.com/Sherlock-Holo/camouflage/session/quic/client"
 	wsslink "github.com/Sherlock-Holo/camouflage/session/wsslink/client"
 	"github.com/Sherlock-Holo/libsocks"
 	log "github.com/sirupsen/logrus"
@@ -58,10 +59,22 @@ func New(cfg *client.Config) (*Client, error) {
 			Path:   cfg.Path,
 		}).String()
 
-		cl.session = wsslink.NewWssLink(wsURL, cfg.Secret, cfg.Period, opts...)
+		cl.session = wsslink.NewClient(wsURL, cfg.Secret, cfg.Period, opts...)
 
 	case client.TypeQuic:
-		panic("TODO")
+		var opts []quic.Option
+
+		if cfg.DebugCA != "" {
+			ca, err := ioutil.ReadFile(cfg.DebugCA)
+			if err != nil {
+				err = errors.Errorf("read ca cert failed: %w", err)
+				log.Fatalf("%+v", err)
+			}
+
+			opts = append(opts, quic.WithDebugCA(ca))
+		}
+
+		cl.session = quic.NewClient(cfg.Host, cfg.Secret, cfg.Period, opts...)
 	}
 
 	return cl, nil
@@ -117,7 +130,7 @@ func (c *Client) handle(socksConn net.Conn) {
 	default:
 		log.Warn("dial queue is full")
 		_ = socks.Handshake(libsocks.TTLExpired)
-		socks.Close()
+		_ = socks.Close()
 		return
 
 	case c.connReqChan <- connReq:
@@ -153,8 +166,8 @@ func (c *Client) handle(socksConn net.Conn) {
 		if err := socks.Handshake(libsocks.Success); err != nil {
 			err := errors.Errorf("client handle error: %w", err)
 			log.Errorf("%+v", err)
-			socks.Close()
-			sessionConn.Close()
+			_ = socks.Close()
+			_ = sessionConn.Close()
 			return
 		}
 
@@ -163,13 +176,13 @@ func (c *Client) handle(socksConn net.Conn) {
 
 	go func() {
 		_, _ = io.Copy(sessionConn, socks)
-		socks.Close()
-		sessionConn.Close()
+		_ = socks.Close()
+		_ = sessionConn.Close()
 	}()
 
 	go func() {
 		_, _ = io.Copy(socks, sessionConn)
-		socks.Close()
-		sessionConn.Close()
+		_ = socks.Close()
+		_ = sessionConn.Close()
 	}()
 }

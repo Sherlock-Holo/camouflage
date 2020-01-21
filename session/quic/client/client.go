@@ -48,7 +48,7 @@ type quicClient struct {
 	closed       atomic.Bool
 }
 
-func newQuicClient(quicAddr, totpSecret string, totpPeriod uint, opts ...Option) *quicClient {
+func NewClient(quicAddr, totpSecret string, totpPeriod uint, opts ...Option) *quicClient {
 	client := &quicClient{
 		addr: quicAddr,
 
@@ -93,6 +93,8 @@ func (q *quicClient) OpenConn(ctx context.Context) (net.Conn, error) {
 
 	if q.quicSession == nil {
 		for {
+			log.Debug("start quic connect")
+
 			err := q.reconnect(ctx)
 			switch {
 			case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
@@ -131,7 +133,7 @@ func (q *quicClient) OpenConn(ctx context.Context) (net.Conn, error) {
 	)
 
 	for i := 0; i < 2; i++ {
-		stream, err = q.quicSession.OpenStreamSync(ctx)
+		stream, err = q.quicSession.OpenStream()
 		if err != nil {
 			return nil, errors.Errorf("open quic stream failed: %w", err)
 		}
@@ -153,6 +155,8 @@ func (q *quicClient) OpenConn(ctx context.Context) (net.Conn, error) {
 			return nil, errors.Errorf("send TOTP code failed: %w", err)
 		}
 
+		log.Debug("write handshake success")
+
 		if err := stream.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
 			return nil, errors.Errorf("set read deadline failed: %w", err)
 		}
@@ -164,6 +168,8 @@ func (q *quicClient) OpenConn(ctx context.Context) (net.Conn, error) {
 
 		switch handshakeResp[0] {
 		case quicSession.HandshakeFailed:
+			log.Debug("handshake failed")
+
 			if i == 1 {
 				return nil, errors.New("connect failed: maybe TOTP secret is wrong")
 			}
@@ -172,6 +178,8 @@ func (q *quicClient) OpenConn(ctx context.Context) (net.Conn, error) {
 
 		case quicSession.HandshakeSuccess:
 		}
+
+		log.Debug("handshake success")
 
 		break
 	}
@@ -191,12 +199,7 @@ func (q *quicClient) OpenConn(ctx context.Context) (net.Conn, error) {
 		}
 	}
 
-	return connection{
-		Stream:     stream,
-		localAddr:  q.quicSession.LocalAddr(),
-		remoteAddr: q.quicSession.RemoteAddr(),
-	}, nil
-
+	return quicSession.NewConnection(stream, q.quicSession.LocalAddr(), q.quicSession.RemoteAddr()), nil
 }
 
 func (q *quicClient) reconnect(ctx context.Context) error {
@@ -204,7 +207,10 @@ func (q *quicClient) reconnect(ctx context.Context) error {
 		_ = q.quicSession.Close()
 	}
 
-	session, err := quic.DialAddrContext(ctx, q.addr, q.tlsConfig, nil)
+	session, err := quic.DialAddrContext(ctx, q.addr, q.tlsConfig, &quic.Config{
+		KeepAlive: true,
+	})
+
 	if err != nil {
 		return errors.Errorf("dial quic failed: %w", err)
 	}

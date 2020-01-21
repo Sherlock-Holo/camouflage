@@ -8,6 +8,7 @@ import (
 
 	config "github.com/Sherlock-Holo/camouflage/config/server"
 	"github.com/Sherlock-Holo/camouflage/session"
+	quic "github.com/Sherlock-Holo/camouflage/session/quic/server"
 	wsslink "github.com/Sherlock-Holo/camouflage/session/wsslink/server"
 	"github.com/Sherlock-Holo/libsocks"
 	log "github.com/sirupsen/logrus"
@@ -19,12 +20,6 @@ type Server struct {
 }
 
 func New(cfg *config.Config) (*Server, error) {
-	// load server certificate
-	serverCert, err := tls.LoadX509KeyPair(cfg.Crt, cfg.Key)
-	if err != nil {
-		return nil, errors.Errorf("read server key pair failed: %w", err)
-	}
-
 	var sess session.Server
 
 	switch cfg.Type {
@@ -33,14 +28,30 @@ func New(cfg *config.Config) (*Server, error) {
 
 		opts = append(opts, wsslink.WithHandshakeTimeout(cfg.Timeout.Duration))
 
-		var err error
-		sess, err = wsslink.NewWssLink(cfg.ListenAddr, cfg.Host, cfg.Path, cfg.Secret, cfg.Period, serverCert, opts...)
+		// load server certificate
+		serverCert, err := tls.LoadX509KeyPair(cfg.Crt, cfg.Key)
+		if err != nil {
+			return nil, errors.Errorf("read server key pair failed: %w", err)
+		}
+
+		sess, err = wsslink.NewServer(cfg.ListenAddr, cfg.Host, cfg.Path, cfg.Secret, cfg.Period, serverCert, opts...)
 		if err != nil {
 			return nil, errors.Errorf("new wss link server failed: %w", err)
 		}
 
 	case config.TypeQuic:
-		panic("TODO")
+		var opts []quic.Option
+
+		// load server certificate
+		serverCert, err := tls.LoadX509KeyPair(cfg.Crt, cfg.Key)
+		if err != nil {
+			return nil, errors.Errorf("read server key pair failed: %w", err)
+		}
+
+		sess, err = quic.NewServer(cfg.ListenAddr, cfg.Secret, cfg.Period, serverCert, opts...)
+		if err != nil {
+			return nil, errors.Errorf("new quic server failed: %w", err)
+		}
 	}
 
 	server := &Server{
@@ -164,7 +175,7 @@ func handle(conn net.Conn) {
 	if err != nil {
 		err = errors.Errorf("server unmarshal address failed: %w", err)
 		log.Errorf("%+v", err)
-		conn.Close()
+		_ = conn.Close()
 
 		return
 	}
@@ -173,7 +184,7 @@ func handle(conn net.Conn) {
 	if err != nil {
 		err = errors.Errorf("server connect target failed: %w", err)
 		log.Errorf("%+v", err)
-		conn.Close()
+		_ = conn.Close()
 
 		return
 	}
@@ -182,14 +193,14 @@ func handle(conn net.Conn) {
 
 	go func() {
 		_, _ = io.Copy(remote, conn)
-		conn.Close()
-		remote.Close()
+		_ = conn.Close()
+		_ = remote.Close()
 	}()
 
 	go func() {
 		_, _ = io.Copy(conn, remote)
-		conn.Close()
-		remote.Close()
+		_ = conn.Close()
+		_ = remote.Close()
 	}()
 }
 
