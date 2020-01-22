@@ -39,6 +39,7 @@ type Config struct {
 	ReverseProxyKey  string   `toml:"reverse_proxy_key"`
 	ReverseProxyCrt  string   `toml:"reverse_proxy_crt"`
 	ReverseProxyAddr string   `toml:"reverse_proxy_addr"`
+	Pprof            string   `toml:"pprof"`
 }
 
 type tomlConfig struct {

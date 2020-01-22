@@ -16,6 +16,9 @@ timeout = "30s"
 secret = "V5PWBWKLNKOSGQIIB2J2GLIAMSS4IGQJ"
 period = 60
 
+# set pprof listen addr (optional)
+pprof = "127.0.0.1:6060"
+
 
 [server]
 type = "quic"
@@ -48,3 +51,6 @@ reverse_proxy_host = "rp.example.com"
 reverse_proxy_key = "script/rp/rp.key"
 reverse_proxy_crt = "script/rp/rp.crt"
 reverse_proxy_addr = "127.0.0.1:80"
+
+# set pprof listen addr (optional)
+pprof = "127.0.0.1:6061"

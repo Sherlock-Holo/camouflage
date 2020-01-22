@@ -5,6 +5,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
+	"net/http"
+	_ "net/http/pprof"
 	"net/url"
 	"time"
 
@@ -75,6 +77,15 @@ func New(cfg *client.Config) (*Client, error) {
 		}
 
 		cl.session = quic.NewClient(cfg.Host, cfg.Secret, cfg.Period, opts...)
+	}
+
+	if cfg.Pprof != "" {
+		go func() {
+			if err := http.ListenAndServe(cfg.Pprof, nil); err != nil {
+				err := errors.Errorf("enable pprof failed: %w", err)
+				log.Warnf("%+v", err)
+			}
+		}()
 	}
 
 	return cl, nil

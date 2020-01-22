@@ -5,6 +5,8 @@ import (
 	"crypto/tls"
 	"io"
 	"net"
+	"net/http"
+	_ "net/http/pprof"
 
 	config "github.com/Sherlock-Holo/camouflage/config/server"
 	"github.com/Sherlock-Holo/camouflage/session"
@@ -56,6 +58,15 @@ func New(cfg *config.Config) (*Server, error) {
 
 	server := &Server{
 		session: sess,
+	}
+
+	if cfg.Pprof != "" {
+		go func() {
+			if err := http.ListenAndServe(cfg.Pprof, nil); err != nil {
+				err := errors.Errorf("enable pprof failed: %w", err)
+				log.Warnf("%+v", err)
+			}
+		}()
 	}
 
 	return server, nil

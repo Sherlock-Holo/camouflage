@@ -30,6 +30,7 @@ type Config struct {
 	Timeout    Duration `toml:"timeout"`
 	Secret     string   `toml:"secret"`
 	Period     uint     `toml:"period"`
+	Pprof      string   `toml:"pprof"`
 }
 
 type tomlConfig struct {
