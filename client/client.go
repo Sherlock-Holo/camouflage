@@ -8,6 +8,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/Sherlock-Holo/camouflage/config/client"
@@ -74,6 +75,18 @@ func New(cfg *client.Config) (*Client, error) {
 			}
 
 			opts = append(opts, quic.WithDebugCA(ca))
+		}
+
+		const missingPort = "missing port in address"
+
+		var addrErr *net.AddrError
+
+		if _, _, err := net.SplitHostPort(cfg.Host); err != nil {
+			if errors.As(err, &addrErr) && addrErr.Err == missingPort {
+				cfg.Host = net.JoinHostPort(cfg.Host, strconv.Itoa(443))
+			} else {
+				return nil, errors.Errorf("split quic host failed: %w", err)
+			}
 		}
 
 		cl.session = quic.NewClient(cfg.Host, cfg.Secret, cfg.Period, opts...)

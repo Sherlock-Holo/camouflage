@@ -108,6 +108,9 @@ func (q *quicClient) OpenConn(ctx context.Context) (net.Conn, error) {
 				return nil, errors.Errorf("connect quic failed: %w", netErr)
 
 			default:
+				err = errors.Errorf("quic connect failed: %w", err)
+				log.Warnf("%+v", err)
+
 				continue
 
 			case err == nil:
