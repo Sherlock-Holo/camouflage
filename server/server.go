@@ -7,6 +7,9 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"net/url"
+	"os"
+	"strings"
 
 	config "github.com/Sherlock-Holo/camouflage/config/server"
 	"github.com/Sherlock-Holo/camouflage/session"
@@ -28,7 +31,46 @@ func New(cfg *config.Config) (*Server, error) {
 	case config.TypeWebsocket:
 		var opts []wsslink.Option
 
-		opts = append(opts, wsslink.WithHandshakeTimeout(cfg.Timeout.Duration))
+		if cfg.Timeout.Duration > 0 {
+			opts = append(opts, wsslink.WithHandshakeTimeout(cfg.Timeout.Duration))
+		}
+
+		if cfg.WebCrt != "" && cfg.WebKey != "" && cfg.WebHost != "" && cfg.WebRoot != "" {
+			if _, err := os.Stat(cfg.WebKey); err != nil {
+				return nil, errors.Errorf("get web root stat failed: %w", err)
+			}
+
+			webCrt, err := tls.LoadX509KeyPair(cfg.WebCrt, cfg.WebKey)
+			if err != nil {
+				return nil, errors.Errorf("load web certificate failed: %w", err)
+			}
+
+			opts = append(opts, wsslink.WithWeb(cfg.WebRoot, cfg.WebHost, webCrt))
+
+			log.Info("enable web")
+		}
+
+		if cfg.ReverseProxyCrt != "" && cfg.ReverseProxyKey != "" && cfg.ReverseProxyHost != "" && cfg.ReverseProxyAddr != "" {
+			if !strings.HasPrefix(cfg.ReverseProxyAddr, "http") {
+				cfg.ReverseProxyAddr = "http://" + cfg.ReverseProxyAddr
+			}
+
+			host, err := url.Parse(cfg.ReverseProxyAddr)
+			if err != nil {
+				return nil, errors.Errorf("parse reverser proxy host failed: %w", err)
+			}
+
+			log.Debugf("reverse proxy host: %s", host)
+
+			reverseProxyCrt, err := tls.LoadX509KeyPair(cfg.ReverseProxyCrt, cfg.ReverseProxyKey)
+			if err != nil {
+				return nil, errors.Errorf("load reverse proxy certificate failed: %w", err)
+			}
+
+			opts = append(opts, wsslink.WithReverseProxy(host, cfg.ReverseProxyAddr, reverseProxyCrt))
+
+			log.Info("enable reverse proxy")
+		}
 
 		// load server certificate
 		serverCert, err := tls.LoadX509KeyPair(cfg.Crt, cfg.Key)

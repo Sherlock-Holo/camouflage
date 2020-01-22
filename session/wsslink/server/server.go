@@ -5,6 +5,8 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"sync"
 	"time"
 
@@ -29,6 +31,51 @@ func (h handshakeTimeout) apply(link *wssLink) {
 
 func WithHandshakeTimeout(timeout time.Duration) Option {
 	return handshakeTimeout(timeout)
+}
+
+type webConfig struct {
+	root string
+	host string
+	crt  tls.Certificate
+}
+
+func (w webConfig) apply(link *wssLink) {
+	link.tlsConfig.Certificates = append(link.tlsConfig.Certificates, w.crt)
+	link.httpMux.Handle(w.host+"/", enableGzip(http.FileServer(http.Dir(w.root))))
+}
+
+func WithWeb(root, host string, crt tls.Certificate) Option {
+	return webConfig{
+		root: root,
+		host: host,
+		crt:  crt,
+	}
+}
+
+type reverseProxyConfig struct {
+	host       *url.URL
+	realserver string
+	crt        tls.Certificate
+}
+
+func (r reverseProxyConfig) apply(link *wssLink) {
+	proxy := httputil.NewSingleHostReverseProxy(r.host)
+	originDirector := proxy.Director
+	proxy.Director = func(r *http.Request) {
+		originDirector(r)
+		// delete origin field to avoid websocket upgrade check failed
+		r.Header.Del("origin")
+	}
+
+	link.httpMux.Handle(r.host.Host+"/", proxy)
+}
+
+func WithReverseProxy(host *url.URL, realserver string, crt tls.Certificate) Option {
+	return reverseProxyConfig{
+		host:       host,
+		realserver: realserver,
+		crt:        crt,
+	}
 }
 
 type wssLink struct {
@@ -156,7 +203,7 @@ func (w *wssLink) wsHandle(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	if !ok || !websocket.IsWebSocketUpgrade(request) {
-		//w.webHandle(w, request) TODO
+		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
