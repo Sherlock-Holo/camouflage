@@ -127,84 +127,22 @@ func (q *quicClient) OpenConn(ctx context.Context) (net.Conn, error) {
 	default:
 	}
 
-	var (
-		stream  quic.Stream
-		err     error
-		codeBuf bytes.Buffer
-	)
-
-	for i := 0; i < 2; i++ {
-		stream, err = q.quicSession.OpenStreamSync(ctx)
-		if err != nil {
-			// hack
-			if quicSession.NoRecentNetwork(err) {
-				log.Debug("session has no recent network, need reconnect")
-
-				if err := q.reconnect(ctx); err != nil {
-					return nil, errors.Errorf("reconnect quic failed: %w", err)
-				}
-
-				continue
-			}
-
+	stream, err := q.quicSession.OpenStreamSync(ctx)
+	if err != nil {
+		if !quicSession.NoRecentNetwork(err) {
 			return nil, errors.Errorf("open quic stream failed: %w", err)
 		}
 
-		code, err := utils.GenCode(q.secret, q.period)
+		log.Debug("session has no recent network, need reconnect")
+
+		if err := q.reconnect(ctx); err != nil {
+			return nil, errors.Errorf("reconnect quic failed: %w", err)
+		}
+
+		stream, err = q.quicSession.OpenStreamSync(ctx)
 		if err != nil {
-			return nil, errors.Errorf("generate TOTP code failed: %w", err)
+			return nil, errors.Errorf("open quic stream failed: %w", err)
 		}
-
-		length := len(code)
-
-		codeBuf.WriteByte(byte(length))
-		codeBuf.WriteString(code)
-
-		codeBytes := codeBuf.Bytes()
-		codeBuf.Reset()
-
-		if _, err := stream.Write(codeBytes); err != nil {
-			// hack, no more hack after this write
-			if quicSession.NoRecentNetwork(err) {
-				log.Debug("session has no recent network, need reconnect")
-
-				if err := q.reconnect(ctx); err != nil {
-					return nil, errors.Errorf("reconnect quic failed: %w", err)
-				}
-
-				continue
-			}
-
-			return nil, errors.Errorf("send TOTP code failed: %w", err)
-		}
-
-		log.Debug("write handshake success")
-
-		if err := stream.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
-			return nil, errors.Errorf("set read deadline failed: %w", err)
-		}
-
-		handshakeResp := make([]byte, 1)
-		if _, err := stream.Read(handshakeResp); err != nil {
-			return nil, errors.Errorf("get TOTP handshake response failed: %w", err)
-		}
-
-		switch handshakeResp[0] {
-		case quicSession.HandshakeFailed:
-			log.Debug("handshake failed")
-
-			if i == 1 {
-				return nil, errors.New("connect failed: maybe TOTP secret is wrong")
-			}
-
-			continue
-
-		case quicSession.HandshakeSuccess:
-		}
-
-		log.Debug("handshake success")
-
-		break
 	}
 
 	if raw := ctx.Value("pre-data"); raw != nil {
@@ -230,16 +168,83 @@ func (q *quicClient) reconnect(ctx context.Context) error {
 		_ = q.quicSession.Close()
 	}
 
-	session, err := quic.DialAddrContext(ctx, q.addr, q.tlsConfig, &quic.Config{
-		KeepAlive:          true,
-		MaxIncomingStreams: math.MaxInt32,
-	})
+	var codeBuf bytes.Buffer
 
-	if err != nil {
-		return errors.Errorf("dial quic failed: %w", err)
+	for i := 0; i < 2; i++ {
+		session, err := quic.DialAddrContext(ctx, q.addr, q.tlsConfig, &quic.Config{
+			KeepAlive:          true,
+			MaxIncomingStreams: math.MaxInt32,
+		})
+
+		if err != nil {
+			return errors.Errorf("dial quic failed: %w", err)
+		}
+
+		code, err := utils.GenCode(q.secret, q.period)
+		if err != nil {
+			return errors.Errorf("generate TOTP code failed: %w", err)
+		}
+
+		length := len(code)
+
+		codeBuf.WriteByte(byte(length))
+		codeBuf.WriteString(code)
+
+		codeBytes := codeBuf.Bytes()
+		codeBuf.Reset()
+
+		stream, err := session.OpenStreamSync(ctx)
+		if err != nil {
+			return errors.Errorf("open handshake stream failed: %w", err)
+		}
+
+		if _, err := stream.Write(codeBytes); err != nil {
+			_ = stream.Close()
+			_ = session.Close()
+
+			return errors.Errorf("send TOTP code failed: %w", err)
+		}
+
+		log.Debug("write handshake success")
+
+		if err := stream.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
+			_ = stream.Close()
+			_ = session.Close()
+
+			return errors.Errorf("set read deadline failed: %w", err)
+		}
+
+		handshakeResp := make([]byte, 1)
+		if _, err := stream.Read(handshakeResp); err != nil {
+			_ = stream.Close()
+			_ = session.Close()
+
+			return errors.Errorf("get TOTP handshake response failed: %w", err)
+		}
+
+		_ = stream.Close()
+
+		switch handshakeResp[0] {
+		case quicSession.HandshakeFailed:
+			_ = session.Close()
+
+			log.Debug("handshake failed")
+
+			if i == 1 {
+
+				return errors.New("connect failed: maybe TOTP secret is wrong")
+			}
+
+			continue
+
+		case quicSession.HandshakeSuccess:
+		}
+
+		q.quicSession = session
+		log.Debug("handshake success")
+
+		break
 	}
-
-	q.quicSession = session
 
 	return nil
 }

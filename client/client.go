@@ -127,7 +127,7 @@ func (c *Client) handle(socksConn net.Conn) {
 	socks, err := NewSocks(socksConn)
 	if err != nil {
 		err = errors.Errorf("client handle error: %w", err)
-		log.Errorf("%v", err)
+		log.Errorf("%+v", err)
 		return
 	}
 

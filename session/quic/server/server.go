@@ -1,12 +1,14 @@
 package server
 
 import (
+	"bufio"
 	"context"
 	"crypto/tls"
 	"io"
 	"math"
 	"net"
 	"sync"
+	"time"
 
 	quicSession "github.com/Sherlock-Holo/camouflage/session/quic"
 	"github.com/Sherlock-Holo/camouflage/utils"
@@ -113,53 +115,6 @@ func (q *quicServer) AcceptConn(ctx context.Context) (net.Conn, error) {
 		return nil, ctx.Err()
 
 	case conn := <-q.acceptChan:
-		log.Debug("start stream handshake")
-
-		buf := make([]byte, 1)
-
-		_, err := conn.Read(buf)
-		if err != nil {
-			_ = conn.Close()
-			return nil, errors.Errorf("read handshake message length failed: %w", err)
-		}
-
-		length := int(buf[0])
-
-		log.Debugf("handshake length %d", length)
-
-		buf = make([]byte, length)
-
-		if _, err := io.ReadFull(conn, buf); err != nil {
-			_ = conn.Close()
-			return nil, errors.Errorf("read handshake message failed: %w", err)
-		}
-
-		code := string(buf)
-
-		ok, err := utils.VerifyCode(code, q.secret, q.period)
-		if err != nil {
-			_ = conn.Close()
-
-			return nil, errors.Errorf("verify code error: %w", err)
-		}
-
-		if ok {
-			if _, err := conn.Write([]byte{quicSession.HandshakeSuccess}); err != nil {
-				_ = conn.Close()
-
-				return nil, errors.Errorf("write handshake success response failed: %w", err)
-			}
-		} else {
-			if _, err := conn.Write([]byte{quicSession.HandshakeFailed}); err != nil {
-				_ = conn.Close()
-
-				return nil, errors.Errorf("write handshake failed response failed: %w", err)
-			}
-
-			// don't return error, keep accept connection
-			return q.AcceptConn(ctx)
-		}
-
 		log.Debug("stream accepted")
 
 		return conn, nil
@@ -194,6 +149,20 @@ func (q *quicServer) handleSession(id uint64, session quic.Session) {
 		q.sessionMap.Delete(id)
 	}()
 
+	timeout, timeoutFunc := context.WithTimeout(context.Background(), 30*time.Second)
+	defer timeoutFunc()
+
+	success, err := q.sessionHandshake(timeout, session)
+	if err != nil {
+		err = errors.Errorf("session handshake failed: %w", err)
+		log.Errorf("%+v", err)
+		return
+	}
+
+	if !success {
+		return
+	}
+
 	for {
 		stream, err := session.AcceptStream(context.Background())
 		if err != nil {
@@ -209,22 +178,6 @@ func (q *quicServer) handleSession(id uint64, session quic.Session) {
 			return
 		}
 
-		/*var netErr net.Error
-
-		switch {
-		case errors.As(err, &netErr) && (netErr.Temporary() || netErr.Timeout()):
-			log.Debugf("ignore error: %v", netErr)
-			continue
-
-		default:
-			err = errors.Errorf("accept quic stream failed: %w", err)
-			log.Errorf("%+v", err)
-
-			return
-
-		case err == nil:
-		}*/
-
 		log.Debug("accept stream")
 
 		select {
@@ -238,4 +191,71 @@ func (q *quicServer) handleSession(id uint64, session quic.Session) {
 
 		log.Debug("stream enter chan")
 	}
+}
+
+func (q *quicServer) sessionHandshake(ctx context.Context, session quic.Session) (success bool, err error) {
+	stream, err := session.AcceptStream(ctx)
+	if err != nil {
+		// hack
+		if quicSession.NoRecentNetwork(err) {
+			log.Debug("session has no recent network, close it")
+			return false, nil
+		}
+
+		err = errors.Errorf("accept handshake quic stream failed: %w", err)
+
+		return false, err
+	}
+
+	defer func() {
+		_ = stream.Close()
+	}()
+
+	// reduce udp read syscall
+	bufStream := bufio.NewReader(stream)
+
+	buf := make([]byte, 1)
+
+	if err := stream.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
+		return false, errors.Errorf("set handshake quic stream read deadline failed: %w", err)
+	}
+
+	if _, err := bufStream.Read(buf); err != nil {
+		return false, errors.Errorf("read handshake message length failed: %w", err)
+	}
+
+	length := int(buf[0])
+
+	log.Debugf("handshake length %d", length)
+
+	buf = make([]byte, length)
+
+	if err := stream.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
+		return false, errors.Errorf("set handshake quic stream read deadline failed: %w", err)
+	}
+
+	if _, err := io.ReadFull(bufStream, buf); err != nil {
+		return false, errors.Errorf("read handshake message failed: %w", err)
+	}
+
+	code := string(buf)
+
+	ok, err := utils.VerifyCode(code, q.secret, q.period)
+	if err != nil {
+		return false, errors.Errorf("verify code error: %w", err)
+	}
+
+	if ok {
+		if _, err := stream.Write([]byte{quicSession.HandshakeSuccess}); err != nil {
+			return false, errors.Errorf("write handshake success response failed: %w", err)
+		}
+	} else {
+		if _, err := stream.Write([]byte{quicSession.HandshakeFailed}); err != nil {
+			return false, errors.Errorf("write handshake failed response failed: %w", err)
+		}
+
+		return false, nil
+	}
+
+	return true, nil
 }
