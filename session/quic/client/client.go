@@ -175,8 +175,10 @@ func (q *quicClient) reconnect(ctx context.Context) error {
 
 	for i := 0; i < 2; i++ {
 		session, err := quic.DialAddrContext(ctx, q.addr, q.tlsConfig, &quic.Config{
-			KeepAlive:          true,
-			MaxIncomingStreams: math.MaxInt32,
+			KeepAlive:                             true,
+			MaxIncomingStreams:                    math.MaxInt32,
+			MaxReceiveConnectionFlowControlWindow: 50 * 1024 * 1024,
+			MaxReceiveStreamFlowControlWindow:     10 * 1024 * 1024,
 		})
 
 		if err != nil {
