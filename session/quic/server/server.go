@@ -226,7 +226,7 @@ func (q *quicServer) sessionHandshake(ctx context.Context, session quic.Session)
 		return false, errors.Errorf("read handshake message length failed: %w", err)
 	}
 
-	length := int(buf[0])
+	length := buf[0]
 
 	log.Debugf("handshake length %d", length)
 
