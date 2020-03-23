@@ -59,8 +59,6 @@ func NewServer(listenAddr, secret string, period uint, serverCert tls.Certificat
 		opt.apply(server)
 	}
 
-	server.tlsConfig.BuildNameToCertificate()
-
 	listener, err := quic.ListenAddr(listenAddr, server.tlsConfig, &quic.Config{
 		KeepAlive:                             true,
 		MaxIncomingStreams:                    math.MaxInt32,

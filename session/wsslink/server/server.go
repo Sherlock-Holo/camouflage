@@ -127,8 +127,6 @@ func NewServer(listenAddr, host, wsPath, secret string, period uint, serverCert 
 		opt.apply(wl)
 	}
 
-	wl.tlsConfig.BuildNameToCertificate()
-
 	wl.httpServer = http.Server{Handler: wl.httpMux}
 
 	tlsListener, err := tls.Listen("tcp", listenAddr, wl.tlsConfig)
