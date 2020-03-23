@@ -123,9 +123,14 @@ func (c *Client) Run() {
 
 func (c *Client) acceptConnReq() {
 	for connReq := range c.connReqChan {
-		ctx := context.WithValue(context.Background(), "pre-data", connReq.Socks.Target())
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+
+		ctx = context.WithValue(context.Background(), "pre-data", connReq.Socks.Target())
 
 		conn, err := c.session.OpenConn(ctx)
+
+		cancel()
+
 		if err != nil {
 			err = errors.Errorf("session open connection failed: %w", err)
 			connReq.Err <- err
