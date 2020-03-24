@@ -104,6 +104,10 @@ func (q *quicClient) OpenConn(ctx context.Context) (net.Conn, error) {
 				Err: err,
 			}
 
+			// when connect timeout, quic session may can't recover
+			_ = q.quicSession.Close()
+			q.quicSession = nil
+
 			return nil, errors.Errorf("connect quic failed: %w", netErr)
 
 		default:

@@ -111,6 +111,10 @@ func (w *wssLink) OpenConn(ctx context.Context) (net.Conn, error) {
 					Err: err,
 				}
 
+				// when connect timeout, manager may can't recover
+				_ = w.manager.Close()
+				w.manager = nil
+
 				return nil, errors.Errorf("connect wss link failed: %w", netErr)
 
 			default:
