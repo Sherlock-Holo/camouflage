@@ -24,6 +24,7 @@ type Client struct {
 	listener    net.Listener
 	session     session.Client
 	connReqChan chan *connRequest
+	timeout     time.Duration
 }
 
 func New(cfg *client.Config) (*Client, error) {
@@ -35,7 +36,7 @@ func New(cfg *client.Config) (*Client, error) {
 
 	cl := &Client{
 		listener:    listener,
-		connReqChan: make(chan *connRequest, 100),
+		connReqChan: make(chan *connRequest, 50),
 	}
 
 	switch cfg.Type {
@@ -53,6 +54,8 @@ func New(cfg *client.Config) (*Client, error) {
 		}
 
 		if cfg.Timeout.Duration > 0 {
+			cl.timeout = cfg.Timeout.Duration
+
 			opts = append(opts, wsslink.WithHandshakeTimeout(cfg.Timeout.Duration))
 		}
 
@@ -76,6 +79,8 @@ func New(cfg *client.Config) (*Client, error) {
 
 			opts = append(opts, quic.WithDebugCA(ca))
 		}
+
+		cl.timeout = cfg.Timeout.Duration
 
 		const missingPort = "missing port in address"
 
@@ -123,14 +128,9 @@ func (c *Client) Run() {
 
 func (c *Client) acceptConnReq() {
 	for connReq := range c.connReqChan {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-
-		ctx = context.WithValue(context.Background(), "pre-data", connReq.Socks.Target())
+		ctx := context.WithValue(connReq.Ctx, session.PreData{}, connReq.Socks.Target())
 
 		conn, err := c.session.OpenConn(ctx)
-
-		cancel()
-
 		if err != nil {
 			err = errors.Errorf("session open connection failed: %w", err)
 			connReq.Err <- err
@@ -149,20 +149,46 @@ func (c *Client) handle(socksConn net.Conn) {
 		return
 	}
 
+	var (
+		ctx    context.Context
+		cancel context.CancelFunc
+	)
+
+	if c.timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), c.timeout)
+	} else {
+		ctx, cancel = context.WithCancel(context.Background())
+	}
+
+	defer cancel()
+
 	connReq := &connRequest{
 		Socks: socks,
 		Conn:  make(chan net.Conn, 1),
 		Err:   make(chan error, 1),
+		Ctx:   ctx,
 	}
 
-	select {
-	default:
-		log.Warn("dial queue is full")
-		_ = socks.Handshake(libsocks.TTLExpired)
-		_ = socks.Close()
-		return
+	if c.timeout > 0 {
+		select {
+		case <-ctx.Done():
+			log.Warn("dial queue is full")
+			_ = socks.Handshake(libsocks.TTLExpired)
+			_ = socks.Close()
+			return
 
-	case c.connReqChan <- connReq:
+		case c.connReqChan <- connReq:
+		}
+	} else {
+		select {
+		default:
+			log.Warn("dial queue is full")
+			_ = socks.Handshake(libsocks.TTLExpired)
+			_ = socks.Close()
+			return
+
+		case c.connReqChan <- connReq:
+		}
 	}
 
 	var sessionConn net.Conn

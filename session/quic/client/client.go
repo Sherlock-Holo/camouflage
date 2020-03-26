@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Sherlock-Holo/camouflage/session"
 	quicSession "github.com/Sherlock-Holo/camouflage/session/quic"
 	"github.com/Sherlock-Holo/camouflage/utils"
 	"github.com/lucas-clemente/quic-go"
@@ -74,7 +75,7 @@ func (q *quicClient) Name() string {
 
 func (q *quicClient) Close() error {
 	if q.closed.CAS(false, true) {
-		return q.quicSession.Close()
+		return q.quicSession.CloseWithError(quicSession.ErrorNoError, "")
 	}
 
 	return nil
@@ -90,7 +91,6 @@ func (q *quicClient) OpenConn(ctx context.Context) (net.Conn, error) {
 	}
 
 	q.connectMutex.Lock()
-	defer q.connectMutex.Unlock()
 
 	for q.quicSession == nil {
 		log.Debug("start quic connect")
@@ -105,8 +105,10 @@ func (q *quicClient) OpenConn(ctx context.Context) (net.Conn, error) {
 			}
 
 			// when connect timeout, quic session may can't recover
-			_ = q.quicSession.Close()
+			_ = q.quicSession.CloseWithError(quicSession.ErrorNoError, "")
 			q.quicSession = nil
+
+			q.connectMutex.Unlock()
 
 			return nil, errors.Errorf("connect quic failed: %w", netErr)
 
@@ -126,11 +128,15 @@ func (q *quicClient) OpenConn(ctx context.Context) (net.Conn, error) {
 	select {
 	case <-q.quicSession.Context().Done():
 		if err := q.reconnect(ctx); err != nil {
+			q.connectMutex.Unlock()
+
 			return nil, errors.Errorf("reconnect quic failed: %w", err)
 		}
 
 	default:
 	}
+
+	q.connectMutex.Unlock()
 
 	stream, err := q.quicSession.OpenStreamSync(ctx)
 	if err != nil {
@@ -150,7 +156,7 @@ func (q *quicClient) OpenConn(ctx context.Context) (net.Conn, error) {
 		}
 	}
 
-	if raw := ctx.Value("pre-data"); raw != nil {
+	if raw := ctx.Value(session.PreData{}); raw != nil {
 		preData, ok := raw.([]byte)
 		if !ok {
 			return nil, &net.OpError{
@@ -170,7 +176,7 @@ func (q *quicClient) OpenConn(ctx context.Context) (net.Conn, error) {
 
 func (q *quicClient) reconnect(ctx context.Context) error {
 	if q.quicSession != nil {
-		_ = q.quicSession.Close()
+		_ = q.quicSession.CloseWithError(quicSession.ErrorNoError, "")
 	}
 
 	q.quicSession = nil
@@ -183,7 +189,7 @@ func (q *quicClient) reconnect(ctx context.Context) error {
 	for i := 0; i < 2; i++ {
 		errRet = nil
 
-		session, err := quic.DialAddrContext(ctx, q.addr, q.tlsConfig, &quic.Config{
+		sess, err := quic.DialAddrContext(ctx, q.addr, q.tlsConfig, &quic.Config{
 			KeepAlive:                             true,
 			MaxIncomingStreams:                    math.MaxInt32,
 			MaxReceiveConnectionFlowControlWindow: 300 * 1024 * 1024,
@@ -208,9 +214,9 @@ func (q *quicClient) reconnect(ctx context.Context) error {
 		codeBytes := codeBuf.Bytes()
 		codeBuf.Reset()
 
-		stream, err := session.OpenStreamSync(ctx)
+		stream, err := sess.OpenStreamSync(ctx)
 		if err != nil {
-			_ = session.Close()
+			_ = sess.CloseWithError(quicSession.ErrorNoError, "")
 			errRet = errors.Errorf("open handshake stream failed: %w", err)
 
 			continue
@@ -218,7 +224,7 @@ func (q *quicClient) reconnect(ctx context.Context) error {
 
 		if _, err := stream.Write(codeBytes); err != nil {
 			_ = stream.Close()
-			_ = session.Close()
+			_ = sess.CloseWithError(quicSession.ErrorNoError, "")
 
 			errRet = errors.Errorf("send TOTP code failed: %w", err)
 			continue
@@ -228,7 +234,7 @@ func (q *quicClient) reconnect(ctx context.Context) error {
 
 		if err := stream.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
 			_ = stream.Close()
-			_ = session.Close()
+			_ = sess.CloseWithError(quicSession.ErrorNoError, "")
 
 			errRet = errors.Errorf("set read deadline failed: %w", err)
 			continue
@@ -237,7 +243,7 @@ func (q *quicClient) reconnect(ctx context.Context) error {
 		handshakeResp := make([]byte, 1)
 		if _, err := stream.Read(handshakeResp); err != nil {
 			_ = stream.Close()
-			_ = session.Close()
+			_ = sess.CloseWithError(quicSession.ErrorNoError, "")
 
 			errRet = errors.Errorf("get TOTP handshake response failed: %w", err)
 			continue
@@ -247,7 +253,7 @@ func (q *quicClient) reconnect(ctx context.Context) error {
 
 		switch handshakeResp[0] {
 		case quicSession.HandshakeFailed:
-			_ = session.Close()
+			_ = sess.CloseWithError(quicSession.ErrorNoError, "")
 			errRet = errors.New("connect failed: maybe TOTP secret is wrong")
 			log.Debug("handshake failed")
 
@@ -256,7 +262,7 @@ func (q *quicClient) reconnect(ctx context.Context) error {
 		case quicSession.HandshakeSuccess:
 		}
 
-		q.quicSession = session
+		q.quicSession = sess
 		log.Debug("handshake success")
 
 		break

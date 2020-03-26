@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Sherlock-Holo/camouflage/session"
 	"github.com/Sherlock-Holo/camouflage/utils"
 	wsWrapper "github.com/Sherlock-Holo/goutils/websocket"
 	"github.com/Sherlock-Holo/link"
@@ -98,7 +99,6 @@ func (w *wssLink) OpenConn(ctx context.Context) (net.Conn, error) {
 	}
 
 	w.connectMutex.Lock()
-	defer w.connectMutex.Unlock()
 
 	if w.manager == nil {
 		for {
@@ -115,6 +115,8 @@ func (w *wssLink) OpenConn(ctx context.Context) (net.Conn, error) {
 				_ = w.manager.Close()
 				w.manager = nil
 
+				w.connectMutex.Unlock()
+
 				return nil, errors.Errorf("connect wss link failed: %w", netErr)
 
 			default:
@@ -130,11 +132,15 @@ func (w *wssLink) OpenConn(ctx context.Context) (net.Conn, error) {
 
 	if w.manager.IsClosed() {
 		if err := w.reconnect(ctx); err != nil {
+			w.connectMutex.Unlock()
+
 			return nil, errors.Errorf("reconnect wss link failed: %w", err)
 		}
 	}
 
-	if raw := ctx.Value("pre-data"); raw != nil {
+	w.connectMutex.Unlock()
+
+	if raw := ctx.Value(session.PreData{}); raw != nil {
 		preData, ok := raw.([]byte)
 		if !ok {
 			return nil, &net.OpError{

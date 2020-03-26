@@ -86,7 +86,8 @@ func (q *quicServer) Close() error {
 		_ = q.listener.Close()
 
 		q.sessionMap.Range(func(_, value interface{}) bool {
-			_ = value.(quic.Session).Close()
+			// it's very confuse why quic-go doesn't offer it
+			_ = value.(quic.Session).CloseWithError(quicSession.ErrorNoError, "")
 
 			return true
 		})
@@ -144,7 +145,7 @@ func (q *quicServer) run() {
 
 func (q *quicServer) handleSession(id uint64, session quic.Session) {
 	defer func() {
-		_ = session.Close()
+		_ = session.CloseWithError(quicSession.ErrorNoError, "")
 
 		q.sessionMap.Delete(id)
 	}()
