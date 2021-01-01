@@ -7,7 +7,7 @@ ADD . /src
 WORKDIR /src
 
 # proxy
-ENV https_proxy=socks5://192.168.1.4:1990
+ENV GOPROXY="https://goproxy.cn|direct"
 
 RUN go mod download
 
