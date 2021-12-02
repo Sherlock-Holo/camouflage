@@ -6,7 +6,7 @@ import (
 
 const Proto = "quic"
 
-const ErrorNoError quic.ErrorCode = 0x100
+const ErrorNoError quic.ApplicationErrorCode = 0x100
 
 const (
 	HandshakeSuccess = 1
