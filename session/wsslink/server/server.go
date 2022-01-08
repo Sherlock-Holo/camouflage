@@ -105,10 +105,9 @@ func NewServer(listenAddr, host, wsPath, secret string, period uint, serverCert 
 		host: host,
 
 		tlsConfig: &tls.Config{
-			PreferServerCipherSuites: true,
-			NextProtos:               []string{"h2"},
-			MinVersion:               tls.VersionTLS12,
-			Certificates:             []tls.Certificate{serverCert},
+			NextProtos:   []string{"h2"},
+			MinVersion:   tls.VersionTLS12,
+			Certificates: []tls.Certificate{serverCert},
 		},
 
 		secret: secret,
