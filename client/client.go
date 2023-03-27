@@ -3,17 +3,15 @@ package client
 import (
 	"context"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"net/url"
-	"strconv"
+	"os"
 	"time"
 
 	"github.com/Sherlock-Holo/camouflage/config/client"
 	"github.com/Sherlock-Holo/camouflage/session"
-	quic "github.com/Sherlock-Holo/camouflage/session/quic/client"
 	wsslink "github.com/Sherlock-Holo/camouflage/session/wsslink/client"
 	"github.com/Sherlock-Holo/libsocks"
 	log "github.com/sirupsen/logrus"
@@ -44,7 +42,7 @@ func New(cfg *client.Config) (*Client, error) {
 		var opts []wsslink.Option
 
 		if cfg.DebugCA != "" {
-			ca, err := ioutil.ReadFile(cfg.DebugCA)
+			ca, err := os.ReadFile(cfg.DebugCA)
 			if err != nil {
 				err = errors.Errorf("read ca cert failed: %w", err)
 				log.Fatalf("%+v", err)
@@ -67,7 +65,7 @@ func New(cfg *client.Config) (*Client, error) {
 
 		cl.session = wsslink.NewClient(wsURL, cfg.Secret, cfg.Period, opts...)
 
-	case client.TypeQuic:
+		/*case client.TypeQuic:
 		var opts []quic.Option
 
 		if cfg.DebugCA != "" {
@@ -94,7 +92,7 @@ func New(cfg *client.Config) (*Client, error) {
 			}
 		}
 
-		cl.session = quic.NewClient(cfg.Host, cfg.Secret, cfg.Period, opts...)
+		cl.session = quic.NewClient(cfg.Host, cfg.Secret, cfg.Period, opts...)*/
 	}
 
 	if cfg.Pprof != "" {

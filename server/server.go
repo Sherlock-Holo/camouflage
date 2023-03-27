@@ -13,7 +13,6 @@ import (
 
 	config "github.com/Sherlock-Holo/camouflage/config/server"
 	"github.com/Sherlock-Holo/camouflage/session"
-	quic "github.com/Sherlock-Holo/camouflage/session/quic/server"
 	wsslink "github.com/Sherlock-Holo/camouflage/session/wsslink/server"
 	"github.com/Sherlock-Holo/libsocks"
 	log "github.com/sirupsen/logrus"
@@ -83,7 +82,7 @@ func New(cfg *config.Config) (*Server, error) {
 			return nil, errors.Errorf("new wss link server failed: %w", err)
 		}
 
-	case config.TypeQuic:
+		/*case config.TypeQuic:
 		var opts []quic.Option
 
 		// load server certificate
@@ -95,7 +94,7 @@ func New(cfg *config.Config) (*Server, error) {
 		sess, err = quic.NewServer(cfg.ListenAddr, cfg.Secret, cfg.Period, serverCert, opts...)
 		if err != nil {
 			return nil, errors.Errorf("new quic server failed: %w", err)
-		}
+		}*/
 	}
 
 	server := &Server{
